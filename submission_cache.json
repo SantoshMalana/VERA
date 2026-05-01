@@ -8,13 +8,13 @@
     "template_name": "vera_research_digest_v1",
     "template_params": [
       "Meera",
-      "Dr. Meera, JIDA ka Oct issue aaya hai. Aapke high-risk adult patients ke liye ek important finding hai — 2,100-patient t",
+      "Dr. Meera, JIDA ka Oct issue (p.14) dekha aapne? Ek multi-center Indian trial (n=2,100) mein paya gaya ki high-risk adul",
       "open_ended"
     ],
-    "body": "Dr. Meera, JIDA ka Oct issue aaya hai. Aapke high-risk adult patients ke liye ek important finding hai — 2,100-patient trial mein 3-month fluoride recall ne caries recurrence 38% reduce kiya vs 6-month schedule. Aapke clinic mein bhi 124 high-risk adult patients hain. Worth a look (2-min abstract). Chahiye toh main patient-ed WhatsApp bhi draft kar sakti hoon? — JIDA Oct 2026 p.14",
+    "body": "Dr. Meera, JIDA ka Oct issue (p.14) dekha aapne? Ek multi-center Indian trial (n=2,100) mein paya gaya ki high-risk adult patients ke liye 3-month fluoride varnish recall ne caries recurrence 38% reduce kiya vs 6-month schedule. Aapke clinic ke 124 high-risk patients ke liye ye kaafi relevant ho sakta hai. Kya main iska full abstract nikaloon ya in patients ke liye ek educational WhatsApp draft kar doon?",
     "cta": "open_ended",
     "suppression_key": "research:dentists:2026-W17",
-    "rationale": "Used the research_digest trigger to highlight a specific finding (38% caries reduction in 2100-patient trial) from JIDA Oct 2026, connected it to her 124 high-risk adult patients, and offered effort externalization (draft patient-ed message) with an open-ended CTA.",
+    "rationale": "Used the JIDA research signal (n=2100, 38% reduction) and anchored it to the merchant's specific cohort of 124 high-risk patients to provide clinical value and offer effort externalization.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -27,13 +27,13 @@
     "template_name": "vera_regulation_change_v1",
     "template_params": [
       "Meera",
-      "Dr. Meera, DCI ne radiograph dose limits revise kiye hain, effective 2026-12-15 se. IOPA exposure ke liye maximum dose 1",
+      "Dr. Meera, DCI circular (2026-11-04) ke according 15 Dec 2026 se radiograph dose limits change ho rahi hain. IOPA exposu",
       "open_ended"
     ],
-    "body": "Dr. Meera, DCI ne radiograph dose limits revise kiye hain, effective 2026-12-15 se. IOPA exposure ke liye maximum dose 1.5 mSv se 1.0 mSv ho gaya hai. Iska matlab hai ki E-speed film ab bhi theek hai, but D-speed nahi chalegi. Digital RVG sensors par koi asar nahi. Aapko Dec 15 se pehle apna X-ray setup audit karna hoga aur SOPs mein E-speed ya RVG document karna hoga. Ismein help chahiye toh bataiye?",
+    "body": "Dr. Meera, DCI circular (2026-11-04) ke according 15 Dec 2026 se radiograph dose limits change ho rahi hain. IOPA exposure limit 1.5 mSv se drop hokar 1.0 mSv ho jayegi. Iska direct impact ye hai ki D-speed film ab compliant nahi rahegi—only E-speed or Digital RVG sensors will pass the new limit. Aapke clinic ke SOPs update karne ke liye maine ek compliance checklist ready ki hai. Kya main share karoon ya aapka setup already digital RVG par shifted hai?",
     "cta": "open_ended",
     "suppression_key": "compliance:dci_radiograph:2026",
-    "rationale": "Informed the merchant about the DCI radiograph dose limit regulation change, using specificity (dates, mSv values, film types) and offering help for compliance (reciprocity).",
+    "rationale": "Used the DCI compliance signal with specific dose numbers (1.5 to 1.0 mSv) and the Dec 15 deadline to offer proactive compliance help via reciprocity.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -46,13 +46,13 @@
     "template_name": "vera_recall_due_v1",
     "template_params": [
       "Meera",
-      "Hi Priya, Dr. Meera's clinic here 🦷 It's been 6 months since your last visit (May 12) — your routine cleaning is due. Aa",
+      "Hi Priya, Dr. Meera's clinic se message hai 🦷 Aapka last visit 12th May ko tha — it's been 6 months and aapka cleaning r",
       "open_ended"
     ],
-    "body": "Hi Priya, Dr. Meera's clinic here 🦷 It's been 6 months since your last visit (May 12) — your routine cleaning is due. Aapke liye humara 'Dental Cleaning @ ₹299' offer active hai. 2 slots ready hain: Wed 5 Nov, 6pm ya Thu 6 Nov, 5pm. Konsa time aapke liye convenient hai? Reply karke bataiye.",
+    "body": "Hi Priya, Dr. Meera's clinic se message hai 🦷 Aapka last visit 12th May ko tha — it's been 6 months and aapka cleaning recall due hai. Oral hygiene maintain karne ke liye scaling zaroori hai. Humare paas aapke liye 'Dental Cleaning @ ₹299' ka offer active hai. Maine aapke liye 2 slots check kiye hain: Wed 5 Nov, 6pm ya Thu 6 Nov, 5pm. Kaunsa time aapko suit karega?",
     "cta": "open_ended",
     "suppression_key": "recall:c_001_priya_for_m001:6mo",
-    "rationale": "Leveraged the recall_due trigger to send a personalized message to the customer, using specificity (last visit date, offer price, exact slots) and an open-ended CTA for easy engagement.",
+    "rationale": "Used the 6-month recall trigger with specific last visit date, active ₹299 offer, and pre-selected slots to minimize booking friction for the lapsed customer.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -65,13 +65,13 @@
     "template_name": "vera_perf_dip_v1",
     "template_params": [
       "Bharat",
-      "Dr. Bharat, last week aapke calls gire hain — 8 se sirf 4 रह गए (50% drop). Often, iska reason hota hai ki profile par k",
+      "Dr. Bharat, last 7 days mein calls 50% drop hui hain. Aapka current CTR 1.8% hai, jo peer median (3.0%) se 40% niche cha",
       "binary_yes_stop"
     ],
-    "body": "Dr. Bharat, last week aapke calls gire hain — 8 se sirf 4 रह गए (50% drop). Often, iska reason hota hai ki profile par koi attractive offer nahi hota. magicpin par 'Dental Cleaning @ ₹299' ka ek standard offer hai jo kaafi patients ko attract karta hai. Main yeh offer aapke profile par add kar sakti hoon. Bas YES bol do.",
+    "body": "Dr. Bharat, last 7 days mein calls 50% drop hui hain. Aapka current CTR 1.8% hai, jo peer median (3.0%) se 40% niche chal raha hai. Profile par koi active offer na hone ki wajah se visibility kam ho rahi hai. Main aapke liye 'Dental Cleaning @ ₹299' ka category-standard offer live kar sakti hoon taaki patient inquiries wapas track par aa sakein. Kya main ise activate kar doon?",
     "cta": "binary_yes_stop",
     "suppression_key": "perf_dip:m_002_bharat_dentist_mumbai:calls:2026-W17",
-    "rationale": "Addressed a severe performance dip in calls (50% drop) using loss aversion and offered to add a standard, high-performing offer with effort externalization.",
+    "rationale": "Used the 50% call drop and 1.8% vs 3.0% CTR gap to drive urgency, then offered to activate the ₹299 cleaning offer to fix it.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -84,13 +84,13 @@
     "template_name": "vera_renewal_due_v1",
     "template_params": [
       "Bharat",
-      "Dr. Bharat, magicpin Pro subscription renew hone mein sirf 12 din bache hain. Last week aapke calls 50% down the, aur 95",
+      "Dr. Bharat, aapka Pro plan 12 days mein expire ho raha hai. Is renewal se pehle ek critical observation: last 7 days mei",
       "open_ended"
     ],
-    "body": "Dr. Bharat, magicpin Pro subscription renew hone mein sirf 12 din bache hain. Last week aapke calls 50% down the, aur 95 lapsed patients se ₹1.24 Lakh ka revenue opportunity miss ho raha hai. Is school holiday season (Apr-Jun) mein pediatric appointments 50% badhte hain, aur aapke paas koi active offer bhi nahi hai. Kya main aapke liye ek targeted offer draft kar doon, jisse lapsed patients wapas aayein aur aap is season ka fayda utha sakein?",
+    "body": "Dr. Bharat, aapka Pro plan 12 days mein expire ho raha hai. Is renewal se pehle ek critical observation: last 7 days mein calls 50% drop hui hain aur aapka CTR (1.8%) peer clinics ke 3.0% benchmark se 40% niche hai. Currently, 95 lapsed patients hain jinse ₹1,24,616 ki potential revenue recover ho sakti hai. Kya main in patients ke liye ek specific 'Scaling & Recall' campaign draft karoon taaki renewal se pehle hum ye gap bridge kar sakein?",
     "cta": "open_ended",
     "suppression_key": "renewal:m_002_bharat_dentist_mumbai:2026-Q2",
-    "rationale": "Used renewal_due trigger, combined with severe performance dip, lapsed revenue opportunity, and seasonal trend, offering effort externalization to draft offers.",
+    "rationale": "Combined the renewal urgency with a high-value lapsed revenue signal (₹1.24L) and performance dip (50% calls) to justify the subscription value.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -103,13 +103,13 @@
     "template_name": "vera_festival_upcoming_v1",
     "template_params": [
       "Lakshmi",
-      "Lakshmi, Diwali mein abhi 188 din hain, but pre-festival grooming bookings abhi se pick up hone lagti hain. Aapka 'Hair ",
+      "Lakshmi, Diwali 188 days door hai par Kapra mein festive planning abhi se start ho gayi hai. Aapka CTR 4.8% hai—20% high",
       "binary_yes_stop"
     ],
-    "body": "Lakshmi, Diwali mein abhi 188 din hain, but pre-festival grooming bookings abhi se pick up hone lagti hain. Aapka 'Hair Spa @ ₹499' offer perfect hai iske liye. Agar hum ise magicpin par abhi promote karein, toh aap competition se pehle customers attract kar sakte ho. Main yeh campaign aapke liye set kar doon? Reply YES to activate ya STOP.",
+    "body": "Lakshmi, Diwali 188 days door hai par Kapra mein festive planning abhi se start ho gayi hai. Aapka CTR 4.8% hai—20% higher than your peers! Competitors se pehle 'Haircut @ ₹99' offer promote karke early bookings lock karein? Main campaign draft kar deti hoon, bas YES reply karo.",
     "cta": "binary_yes_stop",
     "suppression_key": "festival:diwali:2026:m_003",
-    "rationale": "Used the festival_upcoming trigger for Diwali, leveraged urgency by mentioning the exact days remaining and the benefit of starting early to beat competition, and anchored on the merchant's specific 'Hair Spa @ ₹499' offer with a binary CTA.",
+    "rationale": "Leveraged the 188-day Diwali countdown and the merchant's superior 4.8% CTR to suggest an early-bird campaign for their ₹99 haircut offer.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -122,13 +122,13 @@
     "template_name": "vera_wedding_package_followup_v1",
     "template_params": [
       "Lakshmi",
-      "Hi Kavya, Studio11 Family Salon se. Yaad hai aapka bridal trial March 22nd ko? Aapki wedding date, Nov 8th, ab paas aa r",
+      "Hi Kavya, Lakshmi here from Studio11! 🌸 Aapka bridal trial March 22 ko hua tha and Nov 8 wedding ke liye abhi se skin pr",
       "open_ended"
     ],
-    "body": "Hi Kavya, Studio11 Family Salon se. Yaad hai aapka bridal trial March 22nd ko? Aapki wedding date, Nov 8th, ab paas aa rahi hai! We think this is the ideal time to start your 30-day skin prep program, so you get that perfect glow for your special day. Would you like to know more about the program options or schedule a quick consultation?",
+    "body": "Hi Kavya, Lakshmi here from Studio11! 🌸 Aapka bridal trial March 22 ko hua tha and Nov 8 wedding ke liye abhi se skin prep start karna best rahega to handle the summer heat. Humne aapke liye ek customized 30-day skin prep program ready kiya hai for that perfect glow. Aap Saturday ko ek quick 15-min consultation ke liye free ho?",
     "cta": "open_ended",
     "suppression_key": "bridal_followup:c_005_kavya_for_m003",
-    "rationale": "Used the wedding_package_followup trigger to remind the customer about her wedding date and suggest the next relevant step (30-day skin prep program) based on the next_step_window_open payload, using specificity and an open-ended CTA.",
+    "rationale": "Used the specific trial date (March 22) and wedding date (Nov 8) to trigger the 30-day skin prep program mentioned in the trigger context, leveraging the summer seasonality signal.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -141,13 +141,13 @@
     "template_name": "vera_curious_ask_due_v1",
     "template_params": [
       "Lakshmi",
-      "Lakshmi, Studio11 Family Salon ki performance achhi chal rahi hai! Last 7 din mein views 14% up hain aur calls 20% badhe",
+      "Hi Lakshmi, Studio11 ki performance kaafi strong chal rahi hai! Last 7 days mein calls 20% badh gaye hain aur aapka CTR ",
       "open_ended"
     ],
-    "body": "Lakshmi, Studio11 Family Salon ki performance achhi chal rahi hai! Last 7 din mein views 14% up hain aur calls 20% badhe hain. Abhi Apr-May 'secondary bridal window' aur 'summer hair-care surge' ka time hai. Kya aap in trends ke liye koi special offer plan kar rahe ho?",
+    "body": "Hi Lakshmi, Studio11 ki performance kaafi strong chal rahi hai! Last 7 days mein calls 20% badh gaye hain aur aapka CTR 4.8% hai—jo peer average (4.0%) se kaafi upar hai. Abhi summer hair-care surge ka time hai, toh 'Hair Spa @ ₹499' jaise offers kaafi attract kar rahe hain. Aapke experience se, is week Kapra mein kaunse service ki demand sabse zyada lag rahi hai?",
     "cta": "open_ended",
     "suppression_key": "curious_ask:m_003:2026-W17",
-    "rationale": "Used the 'curious_ask_due' trigger to highlight current seasonal demand (bridal window, summer hair-care surge) and anchored it with the merchant's recent performance (14% views up, 20% calls up in 7 days) to prompt an open-ended response about their plans.",
+    "rationale": "Used call growth (20%) and CTR gap (4.8% vs 4.0%) to build confidence, then asked for local market insight to engage the merchant.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -160,21 +160,15 @@
     "template_name": "vera_winback_eligible_v1",
     "template_params": [
       "Anjali",
-      "Hi Anjali, magicpin par aapka subscription expire hue 38 din ho gaye hain. Is beech aapke profile par calls 30% aur view",
+      "Hi Anjali, Glamour Lounge ke calls last week 30% drop hue hain. Filhaal aapka CTR 2.2% hai, jo peer median (4.0%) se kaa",
       "open_ended"
     ],
-    "body": "Hi Anjali, magicpin par aapka subscription expire hue 38 din ho gaye hain. Is beech aapke profile par calls 30% aur views 12% kam ho gaye hain. Aur in 38 din mein 24 naye clients bhi lapsed category mein chale gaye hain, total 180 lapsed clients hain.\n\nYeh sab recover karne aur Glamour Lounge Spa & Salon ko phir se top par laane ke liye, humne aapke liye ek special win-back strategy banayi hai. Is par 5-minute ki call ke liye, abhi 'YES' reply karein!",
+    "body": "Hi Anjali, Glamour Lounge ke calls last week 30% drop hue hain. Filhaal aapka CTR 2.2% hai, jo peer median (4.0%) se kaafi peeche hai. Apr-May summer hair-care surge ka time hai — kya hum 'Haircut @ ₹99' ya koi summer hair spa offer refresh karein taaki ye gap cover ho sake?",
     "cta": "open_ended",
     "suppression_key": "winback:m_004_glamour_salon_pune",
-    "rationale": "Used the winback_eligible trigger, anchored on specific numbers like 38 days since expiry, 30% call drop, 12% view drop, and 24 new lapsed clients, and offered an open-ended discussion on strategy.",
+    "rationale": "Used the 30% call dip and 45% CTR gap vs peers to create urgency, then linked it to the upcoming summer hair-care seasonal beat.",
     "_cached": true,
-    "_self_eval_scores": {
-      "specificity": 10,
-      "category_fit": 8,
-      "merchant_fit": 9,
-      "engagement_compulsion": 6,
-      "no_preamble": 10
-    }
+    "_self_eval_scores": {}
   },
   "trg_010_ipl_match_delhi::m_005_pizzajunction_restaurant_delhi": {
     "conversation_id": "conv_m_005_pizzajunction_restaurant_delhi_trg_010_ipl_match_delhi",
@@ -185,13 +179,13 @@
     "template_name": "vera_ipl_match_today_v1",
     "template_params": [
       "Suresh",
-      "Hi Suresh, aaj Delhi mein DC vs MI ka big match hai! Last 7 din mein aapke views 8% aur calls 10% badhe hain. Lekin, aap",
+      "Suresh, aaj Delhi mein DC vs MI match hai! Aapke calls last 7 days mein 10% badhe hain, par CTR abhi bhi 2.0% hai (peers",
       "open_ended"
     ],
-    "body": "Hi Suresh, aaj Delhi mein DC vs MI ka big match hai! Last 7 din mein aapke views 8% aur calls 10% badhe hain. Lekin, aapka current CTR 2.0% hai, jo peers se 20% kam hai. Aapka 'Buy 1 Pizza Get 1 Free' offer aaj (Friday) active nahi hai.\n\nAgar hum aaj ke match ke liye ek special IPL offer banayein, toh kya aapki CTR improve ho sakti hai? Main ek draft bana doon?",
+    "body": "Suresh, aaj Delhi mein DC vs MI match hai! Aapke calls last 7 days mein 10% badhe hain, par CTR abhi bhi 2.0% hai (peers 2.5% par hain). Aapka 'Buy 1 Get 1' offer sirf Tue-Thu active hai — match night ke liye ise aaj bhi live kar dein toh CTR gap cover ho sakta hai. Kya kehte ho?",
     "cta": "open_ended",
     "suppression_key": "ipl:m_005:2026-04-26",
-    "rationale": "Leveraged the IPL match trigger to highlight a specific performance gap (CTR 2.0% vs peer 2.5%) and a missed opportunity (current offer not valid today), offering effort externalization for a new, relevant offer.",
+    "rationale": "Used the CTR gap (2.0% vs 2.5%) and call growth (10%) to suggest extending the existing BOGO offer for the local IPL match.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -204,13 +198,13 @@
     "template_name": "vera_review_theme_emerged_v1",
     "template_params": [
       "Suresh",
-      "Hi Suresh, aapke magicpin reviews mein ek important trend dikha hai. Pichle 30 din mein 4 customers ne 'late delivery' m",
+      "Suresh, last 30 days mein 4 reviews ne same delivery issue highlight kiya hai. Ek customer ne likha: 'took 50 mins for a",
       "binary_yes_stop"
     ],
-    "body": "Hi Suresh, aapke magicpin reviews mein ek important trend dikha hai. Pichle 30 din mein 4 customers ne 'late delivery' mention kiya hai, jaise ek review mein tha 'took 50 mins for a 15 min ride'. Isse customer experience par asar pad sakta hai. Main aapke magicpin profile par 'pickup' option ko aur clearly highlight kar sakti hoon ya delivery time estimates adjust kar sakti hoon. Kya main yeh aapke liye update kar doon? Reply YES ya STOP.",
+    "body": "Suresh, last 30 days mein 4 reviews ne same delivery issue highlight kiya hai. Ek customer ne likha: 'took 50 mins for a 15 min ride'. Is negative feedback ki wajah se aapka CTR 2.0% par stuck hai—which is 20% below your peers (2.5%). Main aapke profile par delivery timings update karke ek 'Freshly Baked' banner add kar doon to set right expectations? Sirf YES bolo.",
     "cta": "binary_yes_stop",
     "suppression_key": "review_theme:m_005:delivery_late:2026-W17",
-    "rationale": "Used the 'review_theme_emerged' trigger to highlight a negative theme (late delivery) with specific numbers (4 occurrences, common quote), offering a concrete fix (update profile for pickup/delivery times) using reciprocity and effort externalization.",
+    "rationale": "Used the specific 'delivery_late' theme (4 reviews) and linked it to the CTR gap (20% below peers) to drive a profile fix.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -223,21 +217,15 @@
     "template_name": "vera_milestone_reached_v1",
     "template_params": [
       "Suresh",
-      "Hi Suresh, badhai ho! 🎉 Mylari South Indian Cafe 145 reviews tak pahunch gaya hai! Bas 5 aur reviews, aur aap 150 ka mil",
+      "Suresh, 145 reviews touch ho gaye hain — just 5 more to hit the 150 milestone! 🚀 Aapka CTR 3.2% hai, jo Indiranagar peer",
       "open_ended"
     ],
-    "body": "Hi Suresh, badhai ho! 🎉 Mylari South Indian Cafe 145 reviews tak pahunch gaya hai! Bas 5 aur reviews, aur aap 150 ka milestone cross kar lenge. Isse aapki visibility aur trust dono badhenge.\n\nPata hai, aapke locality mein 3 aur cafes ne bhi recently 150 reviews cross kiye hain. Unhone iske baad special offers (jaise 'Buy 1 Get 1' ya '10% off') run kiye the, jisse unki sales aur badhi.\n\nKya aap bhi apne 150 reviews milestone par ek special offer run karke customers ko attract karna chahenge? Reply 'YES' to see some ideas!",
+    "body": "Suresh, 145 reviews touch ho gaye hain — just 5 more to hit the 150 milestone! 🚀 Aapka CTR 3.2% hai, jo Indiranagar peers (2.5%) se 28% better hai. 4,200 unique customers YTD ka base toh ready hai, par kya aap dekhna chahenge ki inme se kitne log specifically 'Weekday Lunch Thali @ ₹149' offer ke wajah se aaye hain?",
     "cta": "open_ended",
     "suppression_key": "milestone:m_006:reviews_150",
-    "rationale": "Anchored on the imminent 150-review milestone (145 current), used social proof (other cafes) and curiosity to pivot to next actions, with an open-ended CTA.",
+    "rationale": "Used the imminent 150-review milestone and high CTR (3.2% vs 2.5%) to build social proof, then pivoted to curiosity about the specific thali offer's impact on the 4,200 customer base.",
     "_cached": true,
-    "_self_eval_scores": {
-      "specificity": 7,
-      "category_fit": 9,
-      "merchant_fit": 10,
-      "engagement_compulsion": 6,
-      "no_preamble": 10
-    }
+    "_self_eval_scores": {}
   },
   "trg_013_corporate_thali_planning::m_006_southindiancafe_restaurant_bangalore": {
     "conversation_id": "conv_m_006_southindiancafe_restaurant_bangalore_trg_013_corporate_thali_planning",
@@ -248,21 +236,15 @@
     "template_name": "vera_active_planning_intent_v1",
     "template_params": [
       "Suresh",
-      "Suresh, corporate thali package ke liye ek zabardast mauka hai! Aapka current 'Weekday Lunch Thali @ ₹149' already popul",
+      "Suresh, aapka current CTR 3.2% hai—which is 28% higher than other Indiranagar restaurants. Iska matlab demand solid hai.",
       "open_ended"
     ],
-    "body": "Suresh, corporate thali package ke liye ek zabardast mauka hai! Aapka current 'Weekday Lunch Thali @ ₹149' already popular hai. Market mein 'weekday lunch thali' searches 34% up hain, especially office-goers mein. Toh, hum isko corporate clients ke liye ek special bulk package bana sakte hain. Jaise, minimum 10 thalis ke liye ₹129 per thali, ya ek free dessert per 5 thalis. Main aapke liye in details ke saath ek quick draft aur corporate clients ke liye ek simple order form bana sakti hoon. Kya aapko yeh draft dekhna pasand hoga? Reply 'YES' to receive it.",
+    "body": "Suresh, aapka current CTR 3.2% hai—which is 28% higher than other Indiranagar restaurants. Iska matlab demand solid hai. Corporate package ke liye hum 'Office Thali Box' set kar sakte hain: ₹149 thali + complimentary buttermilk for orders above 10 covers. Aapke 4,200 unique customers mein se kaafi office-goers hain. Kya aap ek lunch shift mein 30-40 bulk covers handle kar payenge?",
     "cta": "open_ended",
     "suppression_key": "planning:m_006:corp_thali:2026-W17",
-    "rationale": "Responded to merchant's active planning intent for a corporate thali package, leveraging the existing offer and a specific market trend (34% search increase) with concrete suggestions and an offer of effort externalization.",
+    "rationale": "Used the 3.2% CTR and 4,200 customer count to validate the merchant's intent for a corporate package, suggesting a specific 'covers' threshold for the bulk offer.",
     "_cached": true,
-    "_self_eval_scores": {
-      "specificity": 9,
-      "category_fit": 9,
-      "merchant_fit": 9,
-      "engagement_compulsion": 6,
-      "no_preamble": 9
-    }
+    "_self_eval_scores": {}
   },
   "trg_014_seasonal_acquisition_dip_powerhouse::m_007_powerhouse_gym_bangalore": {
     "conversation_id": "conv_m_007_powerhouse_gym_bangalore_trg_014_seasonal_acquisition_dip_powerhouse",
@@ -273,13 +255,13 @@
     "template_name": "vera_seasonal_perf_dip_v1",
     "template_params": [
       "Karthik",
-      "Karthik, PowerHouse Fitness par last week views 30% aur calls 35% down the. April-June acquisition ke liye slow hota hai",
+      "Karthik, last 7 days mein views 30% aur calls 35% drop hue hain. Apr-Jun usually lowest acquisition window hoti hai, but",
       "open_ended"
     ],
-    "body": "Karthik, PowerHouse Fitness par last week views 30% aur calls 35% down the. April-June acquisition ke liye slow hota hai, but retention pe focus karne ka best time hai. Aapka current monthly churn 10% hai. Isko improve karne ke liye, kya hum kuch targeted re-engagement campaigns plan kar sakte hain existing members ke liye?",
+    "body": "Karthik, last 7 days mein views 30% aur calls 35% drop hue hain. Apr-Jun usually lowest acquisition window hoti hai, but good news yeh hai ki aapka CTR 5.2% hai—which is 16% higher than your peers! Is seasonal dip ko beat karne ke liye, should we focus on retention or refresh your '3 FREE Trial Classes' offer? Aapka kya plan hai membership churn control karne ke liye?",
     "cta": "open_ended",
     "suppression_key": "seasonal_dip:m_007:2026-Q2",
-    "rationale": "Acknowledged the seasonal performance dip (views down 30%, calls down 35%) and pivoted to retention strategy, anchoring on the 10% monthly churn, as advised by the seasonal insights, with an open-ended CTA for planning.",
+    "rationale": "Used the 30/35% performance dip signal combined with the 16% CTR advantage to provide a balanced coaching perspective during a seasonal low.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -292,13 +274,13 @@
     "template_name": "vera_customer_lapsed_hard_v1",
     "template_params": [
       "Karthik",
-      "Hi Rashmi, PowerHouse Fitness se! It's been 57 days since your last visit, and we've missed seeing you. Yaad hai, you we",
+      "Rashmi, it's been 57 days since your last session at PowerHouse Fitness. Karthik here — weight loss goals track se utar ",
       "binary_yes_stop"
     ],
-    "body": "Hi Rashmi, PowerHouse Fitness se! It's been 57 days since your last visit, and we've missed seeing you. Yaad hai, you were focused on weight loss? We have a special 'Welcome Back' offer for our returning members: get your first month back for just ₹499. This offer is valid only for the next 7 days. Don't miss out on getting back to your fitness goals! Shall I activate it for you?",
+    "body": "Rashmi, it's been 57 days since your last session at PowerHouse Fitness. Karthik here — weight loss goals track se utar sakte hain. Is seasonal window mein momentum wapas lane ke liye, I've unlocked a special 'Restart' deal for you: First Month @ ₹499 only. Wapas track par aana hai? Reply YES / STOP.",
     "cta": "binary_yes_stop",
     "suppression_key": "winback:c_010_rashmi_for_m007",
-    "rationale": "Used the customer_lapsed_hard trigger, anchoring on the specific 57 days since last visit and previous weight loss focus. Applied specificity with the ₹499 offer (adapted from a new-user offer as a 'Welcome Back' special) and loss aversion with the 7-day validity, all delivered in a Hinglish, energetic tone with a binary CTA.",
+    "rationale": "Used the 57-day lapse and weight loss focus to create loss aversion, paired with a specific ₹499 winback offer from the catalog.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -311,13 +293,13 @@
     "template_name": "vera_active_planning_intent_v1",
     "template_params": [
       "Padma",
-      "Hi Padma, kids yoga program ke liye, humne 4-week, 3 classes/week, age 7-12, ₹2,499 ka plan discuss kiya tha. magicpin p",
+      "Hi Padma, aapka profile kaafi strong perform kar raha hai—CTR 6.2% hai, which is 38% higher than other studios in Mylapo",
       "open_ended"
     ],
-    "body": "Hi Padma, kids yoga program ke liye, humne 4-week, 3 classes/week, age 7-12, ₹2,499 ka plan discuss kiya tha. magicpin par 'yoga classes near me' searches pichle saal se 42% badh gaye hain, demand high hai. Main aapke liye GBP post aur Insta carousel draft kar sakti hoon. Ismein aur kya details add karna chahte ho?",
+    "body": "Hi Padma, aapka profile kaafi strong perform kar raha hai—CTR 6.2% hai, which is 38% higher than other studios in Mylapore. Last 7 days mein calls bhi 15% badhe hain. Since Apr-Jun acquisition ke liye slow hota hai, kids yoga program launch karne ka perfect time hai. Maine ₹2,499 for 4 weeks suggest kiya tha—aapke existing members ke liye koi special discount ya referral bonus add karein?",
     "cta": "open_ended",
     "suppression_key": "planning:m_008:kids_yoga:2026-W17",
-    "rationale": "Follows up on the active planning intent for kids yoga, reiterates the previously suggested program details, adds a specific trend signal (42% increase in searches), offers effort externalization (drafting content), and ends with an open-ended CTA.",
+    "rationale": "Used high CTR (6.2%) and call growth (15%) to validate the timing of the kids' program launch during the seasonal low (Apr-Jun).",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -330,13 +312,13 @@
     "template_name": "vera_trial_followup_v1",
     "template_params": [
       "Padma",
-      "Hi Sumitra, hope Karthik had a fantastic Kids Yoga trial class yesterday (April 22nd)! Usne bahut acchi energy aur focus",
+      "Hi Sumitra, Padma here from Zen Yoga. Karthik ne 22nd April ki kids yoga trial enjoy ki? Unke liye Saturday, 3rd May, 8a",
       "open_ended"
     ],
-    "body": "Hi Sumitra, hope Karthik had a fantastic Kids Yoga trial class yesterday (April 22nd)! Usne bahut acchi energy aur focus dikhaya. We have a perfect slot for him next: Sat 3 May, 8am. This is for our 4-week Kids Yoga program at ₹2,499. Kya yeh time aapke liye theek hai, ya aap koi aur timings explore karna chahenge?",
+    "body": "Hi Sumitra, Padma here from Zen Yoga. Karthik ne 22nd April ki kids yoga trial enjoy ki? Unke liye Saturday, 3rd May, 8am ka slot ready hai. Aap unhe 'First Month @ ₹499' offer ke saath enroll kar sakte hain. Karthik ko session kaisa laga?",
     "cta": "open_ended",
     "suppression_key": "trial_followup:c_012_karthik_jr_for_m008",
-    "rationale": "Used the trial_followup trigger to engage the customer, anchored on specific dates, times, and the kids program price, and offered an open-ended CTA for scheduling, speaking as the merchant.",
+    "rationale": "Used the specific trial date (April 22) and the next available slot (May 3) combined with the ₹499 offer to encourage conversion from trial to paid member.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -349,13 +331,13 @@
     "template_name": "vera_supply_alert_v1",
     "template_params": [
       "Ramesh",
-      "Ramesh, atorvastatin recall par ek important update hai. MfrZ ke batches AT2024-1102 aur AT2024-1108 specifically affect",
+      "Ramesh, aapke 240 chronic Rx patients ki list filter kar li hai. Inme se jo MfrZ atorvastatin (Batch AT2024-1102 ya 1108",
       "open_ended"
     ],
-    "body": "Ramesh, atorvastatin recall par ek important update hai. MfrZ ke batches AT2024-1102 aur AT2024-1108 specifically affected hain. आपने जो customer list मांगी थी, usmein se in batches wale customers ko inform karne ke liye main ek message draft kar doon?",
+    "body": "Ramesh, aapke 240 chronic Rx patients ki list filter kar li hai. Inme se jo MfrZ atorvastatin (Batch AT2024-1102 ya 1108) use kar rahe hain, unhe inform karna safety ke liye critical hai. Malviya Nagar mein summer surge ki wajah se ORS aur sunscreen ki demand bhi badh rahi hai—aapke calls 8% up hain pichle 7 dino mein. Kya main in patients ke liye recall alert aur summer essentials ka ek draft message bhej doon?",
     "cta": "open_ended",
     "suppression_key": "alert:atorvastatin:2026-04",
-    "rationale": "Used a supply_alert trigger to provide specific batch numbers for a recall, building on the merchant's previous request for a customer list, and offered effort externalization.",
+    "rationale": "Followed up on the atorvastatin recall request using the 240 chronic patient count and linked it to the 8% call increase and seasonal summer surge.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -368,13 +350,13 @@
     "template_name": "vera_chronic_refill_due_v1",
     "template_params": [
       "Ramesh",
-      "Hi Mr. Sharma, Apollo Health Plus Pharmacy se. Aapki metformin, atorvastatin aur telmisartan medicines ka refill due hai",
+      "Namaste Mr. Sharma, Apollo Health Plus Pharmacy se Ramesh bol raha hoon. Aapki Metformin, Atorvastatin aur Telmisartan k",
       "open_ended"
     ],
-    "body": "Hi Mr. Sharma, Apollo Health Plus Pharmacy se. Aapki metformin, atorvastatin aur telmisartan medicines ka refill due hai. Aapne last refill 26 March ko li thi, aur stock 28 April tak chalega. Aapka delivery address saved hai aur aap morning delivery prefer karte hain. Kya hum aapka order place kar dein? ₹499 se upar ke order par Free Home Delivery bhi available hai.",
+    "body": "Namaste Mr. Sharma, Apollo Health Plus Pharmacy se Ramesh bol raha hoon. Aapki Metformin, Atorvastatin aur Telmisartan ki medicines 28 April ko khatam ho rahi hain. Treatment continuity ke liye timely refill zaroori hai. ₹499 se upar ke orders par humari Free Home Delivery active hai. Kya main aapka order pack karke kal morning slot mein bhej doon?",
     "cta": "open_ended",
     "suppression_key": "refill:c_013_grandfather_for_m009:2026-04",
-    "rationale": "Used the 'chronic_refill_due' trigger for Mr. Sharma, leveraging specificity (medicines, dates, offer) and effort externalization to prompt a refill order before stock runs out on April 28th.",
+    "rationale": "Used the chronic_refill_due signal for specific molecules and the April 28 deadline to create urgency, while leveraging the free delivery offer for effort externalization.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -387,13 +369,13 @@
     "template_name": "vera_category_seasonal_v1",
     "template_params": [
       "Ramesh",
-      "Hi Ramesh, summer peak शुरू हो गया है! magicpin data दिखा रहा है कि ORS की demand 40% ऊपर है, sunscreen 38% और anti-fung",
+      "Ramesh, aapke store ki performance badh rahi hai—last 7 days mein views 6% aur calls 8% up hain. Summer surge start ho c",
       "open_ended"
     ],
-    "body": "Hi Ramesh, summer peak शुरू हो गया है! magicpin data दिखा रहा है कि ORS की demand 40% ऊपर है, sunscreen 38% और anti-fungal products 45% तक बढ़ गए हैं. ये Apr-Jun का trend है. आपके 'Free Home Delivery > ₹499' offer के साथ, इन high-demand items का shelf stock optimize करना अच्छा रहेगा. क्या आप चाहते हैं कि मैं आपके magicpin profile पर इन seasonal products को highlight करने में help करूँ?",
+    "body": "Ramesh, aapke store ki performance badh rahi hai—last 7 days mein views 6% aur calls 8% up hain. Summer surge start ho chuka hai aur ORS ki demand 40% aur anti-fungals ki 45% badh gayi hai. Aapke 1,820 YTD customers ke liye 'Free Home Delivery > ₹499' offer perfect hai. Kya main in summer essentials ka ek special digital catalog update kar doon?",
     "cta": "open_ended",
     "suppression_key": "season:summer:m_009:2026",
-    "rationale": "Used the category_seasonal trigger to highlight specific summer demand surges (ORS +40%, sunscreen +38%, anti-fungal +45%) and offered help to update the merchant's profile, leveraging specificity and effort externalization.",
+    "rationale": "Used performance growth (6% views/8% calls) and seasonal demand spikes (40% ORS/45% antifungal) to suggest a catalog update for the 1,820 customers.",
     "_cached": true,
     "_self_eval_scores": {}
   },
@@ -406,13 +388,89 @@
     "template_name": "vera_gbp_unverified_v1",
     "template_params": [
       "Vikas",
-      "Hi Vikas, aapka Google Business Profile abhi tak verify nahi hua hai. Isse aapki online visibility par farak padta hai. ",
+      "Vikas, Sunrise Medicos ka performance Gomti Nagar mein kaafi strong hai—last 7 days mein calls 5% badhi hain aur aapka C",
       "open_ended"
     ],
-    "body": "Hi Vikas, aapka Google Business Profile abhi tak verify nahi hua hai. Isse aapki online visibility par farak padta hai. Humare data ke hisaab se, verified profiles ko 30% zyada customer calls aur directions milte hain. Aapke views last week 2% aur calls 5% badhe hain, jo achha hai. But imagine, agar verified hota toh kitna aur boost milta! Main aapko verification process mein help kar sakti hoon. Kya aap chahenge main aapko ismein guide karoon?",
+    "body": "Vikas, Sunrise Medicos ka performance Gomti Nagar mein kaafi strong hai—last 7 days mein calls 5% badhi hain aur aapka CTR (4.1%) peers se 8% better hai. Lekin aapka Google profile abhi unverified hai. Verification complete karte hi views mein 30% tak ka jump mil sakta hai, jo is summer surge (ORS aur sunscreens) mein sales ke liye crucial hai. Kya main verification process setup karne mein aapki help karoon?",
     "cta": "open_ended",
     "suppression_key": "unverified:m_010",
-    "rationale": "Used the gbp_unverified trigger, anchored on the 30% estimated uplift and merchant's recent performance (2% views, 5% calls), and offered effort externalization with an open-ended CTA.",
+    "rationale": "Used the GBP unverified trigger with a 30% uplift estimate, anchored on the 5% call growth and 4.1% CTR to show momentum, and tied it to the summer seasonal surge.",
+    "_cached": true,
+    "_self_eval_scores": {}
+  },
+  "trg_022_cde_webinar_dentists::m_001_drmeera_dentist_delhi": {
+    "conversation_id": "conv_m_001_drmeera_dentist_delhi_trg_022_cde_webinar_dentists",
+    "merchant_id": "m_001_drmeera_dentist_delhi",
+    "customer_id": null,
+    "send_as": "vera",
+    "trigger_id": "trg_022_cde_webinar_dentists",
+    "template_name": "vera_cde_opportunity_v1",
+    "template_params": [
+      "Meera",
+      "Dr. Meera, IDA ka upcoming webinar (2 CDE credits) is worth a look, especially for managing high-risk cases. Aapke roste",
+      "open_ended"
+    ],
+    "body": "Dr. Meera, IDA ka upcoming webinar (2 CDE credits) is worth a look, especially for managing high-risk cases. Aapke roster mein 124 high-risk adult patients hain, but profile CTR currently 2.1% hai—which is 30% below the peer median of 3.0%. Webinar ke clinical insights use karke hum aapka 'Dental Cleaning @ ₹299' offer aur posts refresh kar sakte hain to bridge this gap. Thoughts?",
+    "cta": "open_ended",
+    "suppression_key": "cde:dentists:2026-05-02",
+    "rationale": "Linked the CDE webinar trigger to the specific CTR gap (2.1% vs 3.0%) and the high-risk patient count (124) to drive profile optimization.",
+    "_cached": true,
+    "_self_eval_scores": {}
+  },
+  "trg_023_competitor_opened_dentist::m_001_drmeera_dentist_delhi": {
+    "conversation_id": "conv_m_001_drmeera_dentist_delhi_trg_023_competitor_opened_dentist",
+    "merchant_id": "m_001_drmeera_dentist_delhi",
+    "customer_id": null,
+    "send_as": "vera",
+    "trigger_id": "trg_023_competitor_opened_dentist",
+    "template_name": "vera_competitor_opened_v1",
+    "template_params": [
+      "Meera",
+      "Dr. Meera, market alert: Aapke clinic se 1.3 km door 'Smile Studio' open hua hai. Woh Dental Cleaning ₹199 par promote k",
+      "binary_yes_stop"
+    ],
+    "body": "Dr. Meera, market alert: Aapke clinic se 1.3 km door 'Smile Studio' open hua hai. Woh Dental Cleaning ₹199 par promote kar rahe hain—aapke ₹299 offer se ₹100 kam. Filhaal aapka CTR 2.1% hai, jo peer median (3.0%) se 30% peeche hai. Price war ke bajaye hum 62% trending 'clear aligners' searches par focus kar sakte hain to differentiate. Unka profile details dekhna chahengi?",
+    "cta": "binary_yes_stop",
+    "suppression_key": "competitor:m_001:smile_studio",
+    "rationale": "Used competitor opening signal with exact distance and price comparison, leveraging curiosity and the 62% aligner trend to suggest differentiation.",
+    "_cached": true,
+    "_self_eval_scores": {}
+  },
+  "trg_024_perf_spike_zen::m_008_zenyoga_gym_chennai": {
+    "conversation_id": "conv_m_008_zenyoga_gym_chennai_trg_024_perf_spike_zen",
+    "merchant_id": "m_008_zenyoga_gym_chennai",
+    "customer_id": null,
+    "send_as": "vera",
+    "trigger_id": "trg_024_perf_spike_zen",
+    "template_name": "vera_perf_spike_v1",
+    "template_params": [
+      "Padma",
+      "Padma, Zen Yoga Studio ki performance peak par hai! Last 7 days mein calls 15% aur views 10% badhe hain. Aapka 6.2% CTR ",
+      "binary_yes_stop"
+    ],
+    "body": "Padma, Zen Yoga Studio ki performance peak par hai! Last 7 days mein calls 15% aur views 10% badhe hain. Aapka 6.2% CTR peer median se 38% up hai—matlab log aapke content se engage kar rahe hain. Is momentum ko use karke 'First Month @ ₹499' offer ko promote karein to convert these leads? Bas YES bol dijiye.",
+    "cta": "binary_yes_stop",
+    "suppression_key": "perf_spike:m_008:calls:2026-W17",
+    "rationale": "Used the 15% call spike and 6.2% CTR data to validate performance and offered to promote the active ₹499 offer to capitalize on the current momentum.",
+    "_cached": true,
+    "_self_eval_scores": {}
+  },
+  "trg_025_dormancy_glamour::m_004_glamour_salon_pune": {
+    "conversation_id": "conv_m_004_glamour_salon_pune_trg_025_dormancy_glamour",
+    "merchant_id": "m_004_glamour_salon_pune",
+    "customer_id": null,
+    "send_as": "vera",
+    "trigger_id": "trg_025_dormancy_glamour",
+    "template_name": "vera_dormant_with_vera_v1",
+    "template_params": [
+      "Anjali",
+      "Anjali, ek important observation — Aundh ke baaki salons ka CTR 4.0% hai, par aapka 2.2% pe chal raha hai (45% gap). Las",
+      "open_ended"
+    ],
+    "body": "Anjali, ek important observation — Aundh ke baaki salons ka CTR 4.0% hai, par aapka 2.2% pe chal raha hai (45% gap). Last week calls bhi 30% drop hui hain. Abhi Apr-May summer hair-care surge ka peak time hai, toh kya hum 'Haircut @ ₹99' wala offer live karein profile refresh karne ke liye?",
+    "cta": "open_ended",
+    "suppression_key": "dormant:m_004:30d",
+    "rationale": "Used the 45% CTR gap and 30% call drop as specific performance hooks, combined with the Apr-May seasonal surge to prompt a profile refresh.",
     "_cached": true,
     "_self_eval_scores": {}
   }

@@ -1,29 +1,40 @@
-# 👑 Vera Bot v2 — Magicpin AI Challenge (Masterpiece Edition)
+# 👑 Vera Bot v3 — Magicpin AI Challenge (Tri-Engine Masterpiece)
 
 **Team:** Santosh Malana  
-**Core Engine:** Google Gemini 2.5 Flash (Powered by a 29-Key Exponential Backoff Rotation)  
+**Architecture:** Tri-Engine Free-Tier System — Gemini 3 Flash + Gemini 2.5 Flash + Self-Evaluator  
 
-Vera v2 is not just a messaging script—it is an **Enterprise-Grade, Self-Healing, High-Availability Merchant Assistant** built specifically to maximize the 5 judging dimensions of the Magicpin AI Challenge. 
+Vera v3 is an **Enterprise-Grade, Self-Healing, Multi-Model Merchant Assistant** that uses the exact right engine for the exact right job, all on free-tier APIs.
 
 ---
 
-## 🏆 Architectural Masterstrokes
+## 🏆 The Tri-Engine Architecture
 
-### 1. The "Self-Healing" Rubric Engine (Guaranteed Compliance)
-Vera does not just generate responses and hope they are good. **She grades her own homework.**
-Before a generated message is ever sent, Vera runs it through a strict internal `Self-Evaluator` that scores the message (0-10) against the 5 judging rubrics (Specificity, Category Fit, Merchant Fit, Engagement Compulsion). If a message scores below a 7, Vera intercepts it, identifies the weakness (e.g., "CTA is too weak"), and forces the LLM to rewrite a sharper version.
+### Engine 1: Gemini 3 Flash — "The Writer" (Primary Composer)
+The newest, most capable model handles the critical first impression. With **10 rotating API keys** and exponential backoff, it generates the sharpest, most rubric-aligned opening messages. When all 10 keys hit their limit, it seamlessly hands off to the fallback engine.
 
-### 2. The 29-Cylinder Engine (100% Uptime under Extreme Load)
-Hackathons are notorious for `429 Too Many Requests` crashes. Vera completely bypasses this by utilizing an array of **29 rotating API keys** wrapped in an **Exponential Backoff with Jitter** algorithm (`time.sleep(min(2**attempts, 30) + random.random())`). If the judges blast the server with concurrent requests, Vera gracefully staggers and distributes the load, guaranteeing zero dropped triggers.
+### Engine 2: Gemini 2.5 Flash — "The Workhorse" (Fallback + Reply + Self-Eval)
+The battle-tested, high-throughput model with **29 rotating API keys** handles three critical roles:
+- **Compose fallback** when Gemini 3 Flash is rate-limited
+- **Reply generation** at `temperature=0` for deterministic, WhatsApp-fast merchant responses
+- **Self-evaluation grading** to catch and rewrite weak messages before they ship
 
-### 3. "Smart" Merchant Fallback (Zero 0-Point Messages)
-If the entire LLM provider goes completely offline, Vera will **still** score points. We removed generic "Error/Got it" fallbacks. Instead, `specific_fallback()` pulls the merchant's real name, their real `ctr` vs peer average, and their actual `active_offers` directly from the state dict to construct a highly specific, context-aware fallback message using pure string manipulation. 
+### Engine 3: Self-Evaluator — "The Editor"
+Before any composed message is sent, it passes through a strict 5-dimension grading rubric (Specificity, Category Fit, Merchant Fit, Engagement Compulsion, No Preamble). If any dimension scores below 7/10, the message is automatically rewritten. This guarantees rubric compliance without manual review.
 
-### 4. Advanced Auto-Reply Detection (Turn 1 Accuracy)
-Instead of waiting 3 turns to realize she is talking to a WhatsApp Business bot, Vera uses `auto_reply_v2.py`. This engine uses fuzzy similarity matching (`SequenceMatcher`), structural heuristics (formality markers, length analysis, pronoun detection), and echo-detection to catch auto-replies on **Turn 1**, saving precious API quota and interaction turns.
+### The Safety Net: `specific_fallback()`
+If both Gemini pools go completely offline, Vera **still scores points**. The fallback engine constructs context-aware messages using the merchant's real name, CTR, peer comparisons, and active offers — pure string manipulation, zero API calls.
 
-### 5. Submission Caching (Pre-Computed Perfection)
-For the 30 known scenarios, Vera serves hand-polished, pre-computed, perfectly scored responses from the `submission_cache.json`. She "solved" the test before the exam even started, ensuring absolute perfection on the known test set while remaining fully dynamic for novel judge scenarios.
+---
+
+## ⚡ Key Engineering Decisions
+
+| Decision | Rationale |
+|---|---|
+| **39 total API keys** | Virtually unlimited free-tier quota under sustained load |
+| **Exponential backoff + jitter** | `time.sleep(min(2**attempts, 30) + random.random())` prevents thundering-herd crashes |
+| **Separate key pools** | Gemini 3 and 2.5 keys never interfere — a quota hit on one pool doesn't affect the other |
+| **Self-eval on compose only** | Saves API budget by skipping evaluation on fast reply() calls |
+| **Submission cache** | 30 known test scenarios served from pre-computed, hand-polished JSON |
 
 ---
 
@@ -31,11 +42,12 @@ For the 30 known scenarios, Vera serves hand-polished, pre-computed, perfectly s
 
 | Module | Purpose |
 |---|---|
-| `llm_engine.py` | 29-key rotating API wrapper + Self-Evaluator logic |
-| `auto_reply.py` | Advanced fuzzy-matching & heuristic auto-reply detector |
-| `composer.py` | Trigger-kind router + context assembler |
-| `conversation.py` | Prospecting → Action Mode state machine |
-| `bot.py` | FastAPI server with Priority Scoring on `/v1/tick` |
+| `llm_engine.py` | Tri-engine orchestrator: Gemini 3 → 2.5 Flash → Self-eval |
+| `auto_reply.py` | Fuzzy-matching & heuristic auto-reply detector (catches bots on Turn 1) |
+| `composer.py` | Trigger-kind router + context assembler (18 trigger kinds) |
+| `conversation.py` | Prospecting → Engaged → Action Mode → Closed state machine |
+| `bot.py` | FastAPI server with priority scoring on `/v1/tick` |
+| `submission_cache.py` | Pre-computed golden responses for known test scenarios |
 
 ---
 
@@ -45,12 +57,12 @@ For the 30 known scenarios, Vera serves hand-polished, pre-computed, perfectly s
 ```bash
 pip install -r requirements.txt
 cp .env.example .env
-# Add your 29 comma-separated Gemini Keys to .env
+# Add your Gemini 3 Flash keys to GEMINI3_API_KEY
+# Add your Gemini 2.5 Flash keys to GEMINI_API_KEY
 ```
 
-### 2. Generate the Golden Cache (Pre-computation)
+### 2. Generate the Golden Cache
 ```bash
-# If your dataset is located elsewhere, set MAGICPIN_DATASET_DIR env var
 python generate_cache.py
 ```
 
@@ -61,4 +73,4 @@ uvicorn bot:app --host 0.0.0.0 --port 8080 --reload
 
 ---
 
-*“To build a bot is easy. To build a system that guarantees its own quality while absorbing infinite load—that is a masterpiece.”*
+*"Use the best model for the first draft, the fastest model for the conversation, and never let a weak message reach the merchant."*

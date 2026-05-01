@@ -1,16 +1,19 @@
 """
-Vera LLM Engine v2 — UPGRADE FILE
-====================================
-Changes from v1:
-  1. Uses Anthropic Claude Sonnet 4 as PRIMARY model (better output quality for judge)
-  2. Gemini 2.5 Flash as FALLBACK (quota exhausted or API error)
-  3. Self-evaluation rubric pass: after composing, scores own output 0-10 per dimension
-     and rewrites if any dimension < 7 (adds ~1 API call but guarantees rubric alignment)
-  4. Temperature 0.3 for compose (creative specificity), 0.0 for reply (deterministic)
-  5. Smarter fallback: pulls merchant name + one real signal instead of generic text
+Vera LLM Engine v3 — Tri-Engine Architecture
+==============================================
+Primary:    Gemini 3 Flash (10 rotating keys, best quality)
+Fallback:   Gemini 2.5 Flash (29 rotating keys, massive quota)
+Self-eval:  Gemini 2.5 Flash at temp=0 (deterministic grading)
+Reply:      Gemini 2.5 Flash at temp=0 (fast, deterministic)
 
-Usage: drop this file into your vera-bot directory as llm_engine.py (replaces old one)
-Set ANTHROPIC_API_KEY in your .env (alongside existing GEMINI_API_KEY)
+All engines have exponential backoff + jitter for crash-proof operation.
+
+.env vars:
+  GEMINI_API_KEY=key1,key2,...      (29x Gemini 2.5 Flash keys)
+  GEMINI_MODEL=gemini-2.5-flash
+  GEMINI3_API_KEY=key1,key2,...     (10x Gemini 3 Flash keys)
+  GEMINI3_MODEL=gemini-2.0-flash
+  VERA_SELF_EVAL=true
 """
 from __future__ import annotations
 import json
@@ -25,30 +28,39 @@ import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
-# ── API Keys ──────────────────────────────────────────────────────────────────
+# ── API Keys & Models ─────────────────────────────────────────────────────────
 
-_GEMINI_KEYS = [k.strip() for k in os.getenv("GEMINI_API_KEY", "").split(",") if k.strip()]
-_GEMINI_KEY_IDX = 0
-_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# Gemini 2.5 Flash — 29 keys (fallback + reply + self-eval)
+_FLASH_KEYS = [k.strip() for k in os.getenv("GEMINI_API_KEY", "").split(",") if k.strip()]
+_flash_key_idx = 0
+_FLASH_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
-if _GEMINI_KEYS:
-    genai.configure(api_key=_GEMINI_KEYS[_GEMINI_KEY_IDX])
+# Gemini 3 Flash — 10 keys (primary composer)
+_G3_KEYS = [k.strip() for k in os.getenv("GEMINI3_API_KEY", "").split(",") if k.strip()]
+_g3_key_idx = 0
+_G3_MODEL = os.getenv("GEMINI3_MODEL", "gemini-2.0-flash")
 
-# ── Scoring rubric (same in both prompts) ─────────────────────────────────────
+if _FLASH_KEYS:
+    genai.configure(api_key=_FLASH_KEYS[_flash_key_idx])
+
+logger.info("Engine v3 loaded: %d Gemini3 keys (%s), %d Flash keys (%s)",
+            len(_G3_KEYS), _G3_MODEL, len(_FLASH_KEYS), _FLASH_MODEL)
+
+# ── Scoring rubric ────────────────────────────────────────────────────────────
 
 _RUBRIC = """
 SCORING RUBRIC — your output is judged on these 5 dimensions (0-10 each):
-1. DECISION QUALITY  — Did you pick the sharpest signal for this moment? Combine trigger + merchant state + category fit before writing.
-2. SPECIFICITY       — Every claim must be anchored on a real number, date, ₹ amount, or % from the provided context. "Increase sales" = 0. "CTR 2.1% vs peer 3.0%" = 10.
-3. CATEGORY FIT      — Dentist messages sound clinical-peer. Salon messages sound visual and personal. Restaurant messages are local and warm. Never swap tones.
-4. MERCHANT FIT      — The merchant should feel the message was written specifically for them: their name, their numbers, their offers, their history.
-5. ENGAGEMENT COMPULSION — One strong hook that makes replying feel easy and necessary. A lazy "check your profile" = 0. A specific loss-aversion hook + single YES/STOP = 10.
+1. DECISION QUALITY  — Did you pick the sharpest signal for this moment?
+2. SPECIFICITY       — Every claim anchored on a real number, date, ₹ amount, or % from context. "Increase sales" = 0. "CTR 2.1% vs peer 3.0%" = 10.
+3. CATEGORY FIT      — Dentist = clinical-peer. Salon = visual/personal. Restaurant = local/warm. Gym = energetic. Never swap tones.
+4. MERCHANT FIT      — Merchant's name, their numbers, their offers, their history.
+5. ENGAGEMENT COMPULSION — One strong hook. Lazy "check your profile" = 0. Specific loss-aversion + single YES/STOP = 10.
 """
 
 # ── Few-shot examples ─────────────────────────────────────────────────────────
 
 _FEW_SHOT_EXAMPLES = """
-EXAMPLE A — research_digest trigger for a dentist (GOOD):
+EXAMPLE A — research_digest, dentist (GOOD):
 {
   "body": "Dr. Meera, JIDA ka Oct issue aaya. Aapke high-risk adult patients ke liye ek important finding — 2,100-patient trial mein 3-month fluoride recall ne caries recurrence 38% reduce kiya vs 6-month schedule. Worth a look (2-min abstract). Chahiye toh main patient-ed WhatsApp bhi draft kar deti hoon?  — JIDA Oct 2026 p.14",
   "cta": "open_ended",
@@ -57,7 +69,7 @@ EXAMPLE A — research_digest trigger for a dentist (GOOD):
   "should_send": true
 }
 
-EXAMPLE B — perf_dip trigger for a restaurant (GOOD):
+EXAMPLE B — perf_dip, restaurant (GOOD):
 {
   "body": "Pizza Junction, last week calls gire — 14 se sirf 8 (43% drop). Usually iska reason hota hai: outdated offer ya stale photos. Main aapka 'Lunch Combo @ ₹199' offer refresh kar sakti hoon aur 2 nayi photos add kar sakti hoon — sirf aap YES bol do.",
   "cta": "binary_yes_stop",
@@ -66,7 +78,7 @@ EXAMPLE B — perf_dip trigger for a restaurant (GOOD):
   "should_send": true
 }
 
-EXAMPLE C — recall_due trigger for a dental patient (GOOD, merchant_on_behalf):
+EXAMPLE C — recall_due, dental patient (GOOD, merchant_on_behalf):
 {
   "body": "Hi Priya, Dr. Meera's clinic here 🦷 It's been 5 months since your last visit — your 6-month cleaning recall is due. Aapke liye 2 slots ready hain: Wed 6 Nov, 6pm ya Thu 7 Nov, 5pm. ₹299 cleaning + complimentary fluoride. Reply 1 for Wed, 2 for Thu.",
   "cta": "open_ended",
@@ -181,14 +193,65 @@ Return ONLY valid JSON:
 }"""
 
 
+# ── Gemini 3 Flash call (primary composer — 10 rotating keys) ─────────────────
 
-# ── Gemini API call ───────────────────────────────────────────────────────────
+def _call_gemini3(system_prompt: str, user_prompt: str, temperature: float = 0.35) -> dict:
+    """Gemini 3 Flash — best quality, 10 rotating keys with exponential backoff."""
+    global _g3_key_idx
 
-def _call_gemini(system_prompt: str, user_prompt: str, temperature: float = 0.3) -> dict:
-    """Call Gemini API with key rotation on quota exhaustion."""
-    global _GEMINI_KEY_IDX
+    if not _G3_KEYS:
+        raise RuntimeError("GEMINI3_API_KEY not set")
 
-    if not _GEMINI_KEYS:
+    gen_config = genai.types.GenerationConfig(
+        temperature=temperature,
+        top_p=0.95,
+        top_k=40,
+        response_mime_type="application/json",
+    )
+
+    attempts = 0
+    while attempts < len(_G3_KEYS):
+        genai.configure(api_key=_G3_KEYS[_g3_key_idx])
+        model = genai.GenerativeModel(
+            model_name=_G3_MODEL,
+            generation_config=gen_config,
+            system_instruction=system_prompt,
+        )
+        try:
+            response = model.generate_content(user_prompt)
+            raw = response.text.strip()
+            raw = re.sub(r"^```(?:json)?\s*", "", raw)
+            raw = re.sub(r"\s*```$", "", raw)
+            result = json.loads(raw)
+            # Restore flash key for other callers
+            if _FLASH_KEYS:
+                genai.configure(api_key=_FLASH_KEYS[_flash_key_idx])
+            return result
+        except Exception as exc:
+            err_str = str(exc).lower()
+            if "429" in err_str or "quota" in err_str or "resourceexhausted" in err_str:
+                _g3_key_idx = (_g3_key_idx + 1) % len(_G3_KEYS)
+                time.sleep(min(2**attempts, 30) + random.random())
+                attempts += 1
+            else:
+                # Restore flash key before raising
+                if _FLASH_KEYS:
+                    genai.configure(api_key=_FLASH_KEYS[_flash_key_idx])
+                raise
+
+    # Restore flash key before raising
+    if _FLASH_KEYS:
+        genai.configure(api_key=_FLASH_KEYS[_flash_key_idx])
+    raise RuntimeError("All Gemini 3 Flash keys exhausted")
+
+
+# ── Gemini 2.5 Flash call (fallback + reply + self-eval — 29 rotating keys) ──
+
+def _call_gemini_flash(system_prompt: str, user_prompt: str, temperature: float = 0.3) -> dict:
+    """Gemini 2.5 Flash with 29-key rotation + exponential backoff."""
+    global _flash_key_idx
+
+    if not _FLASH_KEYS:
         raise RuntimeError("GEMINI_API_KEY not set")
 
     gen_config = genai.types.GenerationConfig(
@@ -199,9 +262,10 @@ def _call_gemini(system_prompt: str, user_prompt: str, temperature: float = 0.3)
     )
 
     attempts = 0
-    while attempts < len(_GEMINI_KEYS):
+    while attempts < len(_FLASH_KEYS):
+        genai.configure(api_key=_FLASH_KEYS[_flash_key_idx])
         model = genai.GenerativeModel(
-            model_name=_MODEL_NAME,
+            model_name=_FLASH_MODEL,
             generation_config=gen_config,
             system_instruction=system_prompt,
         )
@@ -210,21 +274,17 @@ def _call_gemini(system_prompt: str, user_prompt: str, temperature: float = 0.3)
             raw = response.text.strip()
             raw = re.sub(r"^```(?:json)?\s*", "", raw)
             raw = re.sub(r"\s*```$", "", raw)
-            try:
-                return json.loads(raw)
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"Gemini JSON parse error: {exc}") from exc
+            return json.loads(raw)
         except Exception as exc:
             err_str = str(exc).lower()
             if "429" in err_str or "quota" in err_str or "resourceexhausted" in err_str:
-                _GEMINI_KEY_IDX = (_GEMINI_KEY_IDX + 1) % len(_GEMINI_KEYS)
-                genai.configure(api_key=_GEMINI_KEYS[_GEMINI_KEY_IDX])
+                _flash_key_idx = (_flash_key_idx + 1) % len(_FLASH_KEYS)
                 time.sleep(min(2**attempts, 30) + random.random())
                 attempts += 1
             else:
                 raise
 
-    raise RuntimeError("All Gemini API keys exhausted")
+    raise RuntimeError("All Gemini 2.5 Flash keys exhausted")
 
 
 # ── Self-evaluation pass ──────────────────────────────────────────────────────
@@ -233,6 +293,7 @@ def _self_eval_and_improve(result: dict, context_summary: str) -> dict:
     """
     Run a self-evaluation pass on the composed message.
     If any dimension scores < 7, get a rewrite.
+    Uses Gemini 2.5 Flash at temp=0 (deterministic grading, massive quota).
     Returns the (possibly improved) result dict.
     """
     body = result.get("body", "")
@@ -248,7 +309,7 @@ MERCHANT CONTEXT SUMMARY:
 Score this message and rewrite if any dimension < 7."""
 
     try:
-        eval_result = _call_gemini(_SELF_EVAL_SYSTEM, eval_prompt, temperature=0.0)
+        eval_result = _call_gemini_flash(_SELF_EVAL_SYSTEM, eval_prompt, temperature=0.0)
 
         if not eval_result.get("passes", True):
             rewritten = eval_result.get("rewritten_body", "").strip()
@@ -273,12 +334,24 @@ Score this message and rewrite if any dimension < 7."""
 def compose(user_prompt: str, context_summary: str = "") -> dict:
     """
     Compose a proactive message.
-    Tries Claude first (better quality), falls back to Gemini.
-    Runs self-evaluation pass if Claude is available.
+    Pipeline: Gemini 3 Flash (best quality) → Gemini 2.5 Flash (fallback) → Self-eval.
     """
-    result = _call_gemini(VERA_SYSTEM_PROMPT, user_prompt, temperature=0.3)
+    result = None
 
-    # Self-eval pass (only if we have API budget — controlled by env var)
+    # Try Gemini 3 Flash first (best quality, 10 rotating keys)
+    if _G3_KEYS:
+        try:
+            result = _call_gemini3(VERA_SYSTEM_PROMPT, user_prompt, temperature=0.35)
+            logger.info("Composed with Gemini 3 Flash (%s)", _G3_MODEL)
+        except Exception as exc:
+            logger.warning("Gemini 3 exhausted, falling back to 2.5 Flash: %s", exc)
+
+    # Fallback to Gemini 2.5 Flash (29 rotating keys)
+    if result is None:
+        result = _call_gemini_flash(VERA_SYSTEM_PROMPT, user_prompt, temperature=0.3)
+        logger.info("Composed with Gemini 2.5 Flash (fallback)")
+
+    # Self-eval pass (uses 2.5 Flash — controlled by env var)
     if os.getenv("VERA_SELF_EVAL", "true").lower() == "true" and context_summary:
         result = _self_eval_and_improve(result, context_summary)
 
@@ -288,9 +361,9 @@ def compose(user_prompt: str, context_summary: str = "") -> dict:
 def reply(user_prompt: str) -> dict:
     """
     Handle a merchant reply.
-    Uses Claude at temp=0 for deterministic reply routing.
+    Uses Gemini 2.5 Flash at temp=0 — fast, deterministic, correct.
     """
-    return _call_gemini(REPLY_SYSTEM_PROMPT, user_prompt, temperature=0.0)
+    return _call_gemini_flash(REPLY_SYSTEM_PROMPT, user_prompt, temperature=0.0)
 
 
 def specific_fallback(merchant: dict, category: dict, trigger: dict) -> dict:

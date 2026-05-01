@@ -12,7 +12,7 @@ All engines have exponential backoff + jitter for crash-proof operation.
   GEMINI_API_KEY=key1,key2,...      (29x Gemini 2.5 Flash keys)
   GEMINI_MODEL=gemini-2.5-flash
   GEMINI3_API_KEY=key1,key2,...     (10x Gemini 3 Flash keys)
-  GEMINI3_MODEL=gemini-2.0-flash
+  GEMINI3_MODEL=gemini-3-flash
   VERA_SELF_EVAL=true
 """
 from __future__ import annotations
@@ -38,7 +38,7 @@ _FLASH_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 # Gemini 3 Flash — 10 keys (primary composer)
 _G3_KEYS = [k.strip() for k in os.getenv("GEMINI3_API_KEY", "").split(",") if k.strip()]
 _g3_key_idx = 0
-_G3_MODEL = os.getenv("GEMINI3_MODEL", "gemini-2.0-flash")
+_G3_MODEL = os.getenv("GEMINI3_MODEL", "gemini-3-flash-preview")
 
 if _FLASH_KEYS:
     genai.configure(api_key=_FLASH_KEYS[_flash_key_idx])

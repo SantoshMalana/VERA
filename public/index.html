@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vera Bot — Live Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --panel-border: rgba(255, 255, 255, 0.1);
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --wa-bg: #0b141a;
+            --wa-header: #202c33;
+            --wa-chat-bg: #0efe2611;
+            --wa-msg-in: #202c33;
+            --wa-msg-out: #005c4b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--bg-color);
+            background-image: radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
+                              radial-gradient(circle at 85% 30%, rgba(16, 185, 129, 0.15), transparent 25%);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 10;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(90deg, #60a5fa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            padding: 2rem;
+            gap: 2rem;
+        }
+
+        /* ── Magicpin Control Center ── */
+        .control-panel {
+            flex: 1;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 1rem;
+            padding: 2rem;
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .control-panel h2 {
+            font-size: 1.25rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: #e2e8f0;
+        }
+
+        .action-card {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--panel-border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .action-card p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-success {
+            background: #10b981;
+        }
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .log-box {
+            flex: 1;
+            background: #000;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #4ade80;
+            overflow-y: auto;
+            border: 1px solid #333;
+        }
+
+        /* ── WhatsApp Preview ── */
+        .wa-preview {
+            width: 400px;
+            background: var(--wa-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .wa-header {
+            background: var(--wa-header);
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            z-index: 2;
+        }
+
+        .wa-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .wa-header-info h3 {
+            font-size: 1rem;
+            font-weight: 500;
+        }
+        .wa-header-info p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .wa-chat {
+            flex: 1;
+            background: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .msg-bubble {
+            max-width: 85%;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            position: relative;
+            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            white-space: pre-wrap;
+        }
+
+        .msg-in {
+            align-self: flex-start;
+            background: var(--wa-msg-in);
+            border-top-left-radius: 0;
+            color: #fff;
+        }
+
+        .msg-out {
+            align-self: flex-end;
+            background: var(--wa-msg-out);
+            border-top-right-radius: 0;
+            color: #fff;
+        }
+
+        .msg-time {
+            font-size: 0.65rem;
+            color: rgba(255,255,255,0.6);
+            float: right;
+            margin-top: 0.5rem;
+            margin-left: 0.5rem;
+        }
+
+        .wa-input-area {
+            background: var(--wa-header);
+            padding: 1rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .wa-input-area input {
+            flex: 1;
+            background: var(--wa-bg);
+            border: none;
+            padding: 0.75rem 1rem;
+            border-radius: 1.5rem;
+            color: white;
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .wa-input-area button {
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--wa-msg-out);
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .loading {
+            align-self: flex-start;
+            background: var(--wa-msg-in);
+            padding: 0.75rem 1.5rem;
+            border-radius: 1rem;
+            border-top-left-radius: 0;
+            display: none;
+            gap: 0.3rem;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            background: #fff;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>✨ Vera Intelligence</h1>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <span style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #4ade80;">
+                <span style="width: 8px; height: 8px; background: #4ade80; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #4ade80;"></span>
+                System Online
+            </span>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Control Center -->
+        <div class="control-panel">
+            <h2>Magicpin Control Center</h2>
+            
+            <div class="action-card">
+                <h3>1. Push Context (Simulator)</h3>
+                <p>Simulates the Magicpin backend pushing a category, merchant profile, and a live trigger (e.g., "Performance Dip") to Vera.</p>
+                <button onclick="pushContext()" id="btn-push">Push Data & Trigger</button>
+            </div>
+
+            <div class="action-card">
+                <h3>2. Trigger Proactive Message (Tick)</h3>
+                <p>Simulates the CRON job calling `/v1/tick`. Vera will evaluate the trigger and compose an intelligent WhatsApp message.</p>
+                <button onclick="sendTick()" id="btn-tick" class="btn-success" disabled style="opacity: 0.5;">Run Tick & Compose</button>
+            </div>
+
+            <div class="log-box" id="sys-log">
+                > System initialized. Ready to push context.
+            </div>
+        </div>
+
+        <!-- WhatsApp Phone Preview -->
+        <div class="wa-preview">
+            <div class="wa-header">
+                <div class="wa-avatar">V</div>
+                <div class="wa-header-info">
+                    <h3>Vera by magicpin</h3>
+                    <p>Business Account</p>
+                </div>
+            </div>
+            
+            <div class="wa-chat" id="chat-window">
+                <!-- Messages will appear here -->
+                
+                <div class="loading" id="typing-indicator">
+                    <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+                </div>
+            </div>
+
+            <div class="wa-input-area">
+                <input type="text" id="wa-input" placeholder="Type a reply..." onkeypress="handleEnter(event)" disabled>
+                <button onclick="sendReply()" id="btn-send" disabled>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let currentMerchantId = "m_001_drmeera_dentist_delhi";
+        let currentConvId = "conv_demo_1";
+        
+        function log(msg) {
+            const logBox = document.getElementById('sys-log');
+            logBox.innerHTML += `<br>> ${msg}`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function showTyping() {
+            document.getElementById('typing-indicator').style.display = 'flex';
+            document.getElementById('chat-window').scrollTop = document.getElementById('chat-window').scrollHeight;
+        }
+
+        function hideTyping() {
+            document.getElementById('typing-indicator').style.display = 'none';
+        }
+
+        function formatTime() {
+            return new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+
+        function addMessage(text, type) {
+            const chat = document.getElementById('chat-window');
+            const typing = document.getElementById('typing-indicator');
+            
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `msg-bubble ${type}`;
+            msgDiv.innerHTML = `${text}<div class="msg-time">${formatTime()}</div>`;
+            
+            chat.insertBefore(msgDiv, typing);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        async function pushContext() {
+            const btn = document.getElementById('btn-push');
+            btn.innerText = "Pushing...";
+            btn.disabled = true;
+
+            const categoryPayload = {
+                scope: "category", context_id: "dentists", version: 1, delivered_at: new Date().toISOString(),
+                payload: { slug: "dentists", display_name: "Dentists", voice: { tone: "professional" } }
+            };
+
+            const merchantPayload = {
+                scope: "merchant", context_id: currentMerchantId, version: 1, delivered_at: new Date().toISOString(),
+                payload: {
+                    merchant_id: currentMerchantId, category_slug: "dentists",
+                    identity: { name: "Dr. Meera's Dental Clinic", owner_first_name: "Dr. Meera", city: "Delhi", languages: ["en", "hi"] },
+                    customer_aggregate: { high_risk_adult_count: 124, retention_6mo_pct: 0.45 },
+                    performance: { delta_7d: { clicks: -0.15 } }
+                }
+            };
+
+            const triggerId = "trg_demo_" + Date.now();
+            window.currentTriggerId = triggerId;
+
+            const triggerPayload = {
+                scope: "trigger", context_id: triggerId, version: 1, delivered_at: new Date().toISOString(),
+                payload: {
+                    id: triggerId, scope: "merchant", kind: "perf_dip", merchant_id: currentMerchantId,
+                    urgency: 3, payload: { metric: "clicks", delta_7d: -0.15, absolute_7d: 45 }
+                }
+            };
+
+            try {
+                await fetch(`${API_BASE}/v1/context`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(categoryPayload) });
+                await fetch(`${API_BASE}/v1/context`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(merchantPayload) });
+                await fetch(`${API_BASE}/v1/context`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(triggerPayload) });
+                
+                log("Successfully pushed Category, Merchant, and Trigger data.");
+                
+                btn.innerText = "Data Pushed";
+                document.getElementById('btn-tick').disabled = false;
+                document.getElementById('btn-tick').style.opacity = "1";
+            } catch (e) {
+                log(`Error: ${e.message}`);
+                btn.innerText = "Failed";
+                btn.disabled = false;
+            }
+        }
+
+        async function sendTick() {
+            const btn = document.getElementById('btn-tick');
+            btn.innerText = "Composing...";
+            btn.disabled = true;
+            showTyping();
+
+            try {
+                const response = await fetch(`${API_BASE}/v1/tick`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        now: new Date().toISOString(),
+                        available_triggers: [window.currentTriggerId]
+                    })
+                });
+                
+                const data = await response.json();
+                hideTyping();
+                
+                if (data.actions && data.actions.length > 0) {
+                    const action = data.actions[0];
+                    currentConvId = action.conversation_id;
+                    addMessage(action.body, 'msg-in');
+                    log(`Tick composed message. Rationale: ${action.rationale}`);
+                    
+                    document.getElementById('wa-input').disabled = false;
+                    document.getElementById('btn-send').disabled = false;
+                    document.getElementById('wa-input').focus();
+                } else {
+                    log("Tick evaluated but decided not to send any messages.");
+                }
+                btn.innerText = "Tick Sent";
+            } catch (e) {
+                hideTyping();
+                log(`Error: ${e.message}`);
+                btn.innerText = "Failed";
+                btn.disabled = false;
+            }
+        }
+
+        async function sendReply() {
+            const input = document.getElementById('wa-input');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            input.value = '';
+            input.disabled = true;
+            document.getElementById('btn-send').disabled = true;
+            
+            addMessage(text, 'msg-out');
+            showTyping();
+            log(`Merchant replied: "${text}"`);
+
+            try {
+                const response = await fetch(`${API_BASE}/v1/reply`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        conversation_id: currentConvId,
+                        merchant_id: currentMerchantId,
+                        customer_id: null,
+                        from_role: "merchant",
+                        message: text,
+                        received_at: new Date().toISOString(),
+                        turn_number: 2
+                    })
+                });
+                
+                const data = await response.json();
+                hideTyping();
+                
+                if (data.action === "end") {
+                    if (data.body) addMessage(data.body, 'msg-in');
+                    log(`Vera ended the conversation. Rationale: ${data.rationale}`);
+                    input.placeholder = "Conversation closed.";
+                } else {
+                    addMessage(data.body, 'msg-in');
+                    log(`Vera replied. Action: ${data.action}, Rationale: ${data.rationale}`);
+                    input.disabled = false;
+                    document.getElementById('btn-send').disabled = false;
+                    input.focus();
+                }
+            } catch (e) {
+                hideTyping();
+                log(`Error: ${e.message}`);
+                input.disabled = false;
+                document.getElementById('btn-send').disabled = false;
+            }
+        }
+
+        function handleEnter(e) {
+            if (e.key === 'Enter') {
+                sendReply();
+            }
+        }
+    </script>
+</body>
+</html>

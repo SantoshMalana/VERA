@@ -24,7 +24,8 @@ import random
 import logging
 from typing import Optional
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +41,7 @@ _G3_KEYS = [k.strip() for k in os.getenv("GEMINI3_API_KEY", "").split(",") if k.
 _g3_key_idx = 0
 _G3_MODEL = os.getenv("GEMINI3_MODEL", "gemini-3-flash-preview")
 
-if _FLASH_KEYS:
-    genai.configure(api_key=_FLASH_KEYS[_flash_key_idx])
+
 
 logger.info("Engine v3 loaded: %d Gemini3 keys (%s), %d Flash keys (%s)",
             len(_G3_KEYS), _G3_MODEL, len(_FLASH_KEYS), _FLASH_MODEL)
@@ -202,31 +202,27 @@ def _call_gemini3(system_prompt: str, user_prompt: str, temperature: float = 0.3
     if not _G3_KEYS:
         raise RuntimeError("GEMINI3_API_KEY not set")
 
-    gen_config = genai.types.GenerationConfig(
+    config = types.GenerateContentConfig(
         temperature=temperature,
         top_p=0.95,
         top_k=40,
         response_mime_type="application/json",
+        system_instruction=system_prompt,
     )
 
     attempts = 0
     while attempts < len(_G3_KEYS):
-        genai.configure(api_key=_G3_KEYS[_g3_key_idx])
-        model = genai.GenerativeModel(
-            model_name=_G3_MODEL,
-            generation_config=gen_config,
-            system_instruction=system_prompt,
-        )
+        client = genai.Client(api_key=_G3_KEYS[_g3_key_idx])
         try:
-            response = model.generate_content(user_prompt)
+            response = client.models.generate_content(
+                model=_G3_MODEL,
+                contents=user_prompt,
+                config=config,
+            )
             raw = response.text.strip()
             raw = re.sub(r"^```(?:json)?\s*", "", raw)
             raw = re.sub(r"\s*```$", "", raw)
-            result = json.loads(raw)
-            # Restore flash key for other callers
-            if _FLASH_KEYS:
-                genai.configure(api_key=_FLASH_KEYS[_flash_key_idx])
-            return result
+            return json.loads(raw)
         except Exception as exc:
             err_str = str(exc).lower()
             if "429" in err_str or "quota" in err_str or "resourceexhausted" in err_str:
@@ -234,14 +230,8 @@ def _call_gemini3(system_prompt: str, user_prompt: str, temperature: float = 0.3
                 time.sleep(min(2**attempts, 30) + random.random())
                 attempts += 1
             else:
-                # Restore flash key before raising
-                if _FLASH_KEYS:
-                    genai.configure(api_key=_FLASH_KEYS[_flash_key_idx])
                 raise
 
-    # Restore flash key before raising
-    if _FLASH_KEYS:
-        genai.configure(api_key=_FLASH_KEYS[_flash_key_idx])
     raise RuntimeError("All Gemini 3 Flash keys exhausted")
 
 
@@ -254,23 +244,23 @@ def _call_gemini_flash(system_prompt: str, user_prompt: str, temperature: float 
     if not _FLASH_KEYS:
         raise RuntimeError("GEMINI_API_KEY not set")
 
-    gen_config = genai.types.GenerationConfig(
+    config = types.GenerateContentConfig(
         temperature=temperature,
         top_p=1.0,
         top_k=1 if temperature == 0.0 else 40,
         response_mime_type="application/json",
+        system_instruction=system_prompt,
     )
 
     attempts = 0
     while attempts < len(_FLASH_KEYS):
-        genai.configure(api_key=_FLASH_KEYS[_flash_key_idx])
-        model = genai.GenerativeModel(
-            model_name=_FLASH_MODEL,
-            generation_config=gen_config,
-            system_instruction=system_prompt,
-        )
+        client = genai.Client(api_key=_FLASH_KEYS[_flash_key_idx])
         try:
-            response = model.generate_content(user_prompt)
+            response = client.models.generate_content(
+                model=_FLASH_MODEL,
+                contents=user_prompt,
+                config=config,
+            )
             raw = response.text.strip()
             raw = re.sub(r"^```(?:json)?\s*", "", raw)
             raw = re.sub(r"\s*```$", "", raw)

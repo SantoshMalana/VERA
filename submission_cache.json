@@ -18,6 +18,25 @@
     "_cached": true,
     "_self_eval_scores": {}
   },
+  "trg_001_research_digest_dentists::m_002_bharat_dentist_mumbai": {
+    "conversation_id": "conv_m_002_bharat_dentist_mumbai_trg_001_research_digest_dentists",
+    "merchant_id": "m_002_bharat_dentist_mumbai",
+    "customer_id": null,
+    "send_as": "vera",
+    "trigger_id": "trg_001_research_digest_dentists",
+    "template_name": "vera_research_digest_v1",
+    "template_params": [
+      "Bharat",
+      "Bharat — CTR 1.8% hai, peer 3.0% se 40% niche! JIDA Oct 2026: 2,100-patient trial mein 3-month recall ne caries 38% reduc",
+      "open_ended"
+    ],
+    "body": "Bharat — CTR 1.8% hai, peer 3.0% se 40% niche! JIDA Oct 2026: 2,100-patient trial mein 3-month recall ne caries 38% reduce kiya. 95 lapsed patients ke liye recall draft karoon? 🦷",
+    "cta": "open_ended",
+    "suppression_key": "research:dentists:2026-W17",
+    "rationale": "Used severe CTR loss-aversion hook (40% below peer) combined with specific JIDA research findings to target Bharat's 95 lapsed patients via effort externalization.",
+    "_cached": true,
+    "_self_eval_scores": {}
+  },
   "trg_002_compliance_dci_radiograph::m_001_drmeera_dentist_delhi": {
     "conversation_id": "conv_m_001_drmeera_dentist_delhi_trg_002_compliance_dci_radiograph",
     "merchant_id": "m_001_drmeera_dentist_delhi",
@@ -509,6 +528,25 @@
     "cta": "binary_yes_stop",
     "suppression_key": "ipl:m_005:2026-04-26",
     "rationale": "Used the CTR gap (2.0% vs 2.5%) and call growth (10%) to suggest extending the existing BOGO offer for the local IPL match.",
+    "_cached": true,
+    "_self_eval_scores": {}
+  },
+  "trg_010_ipl_match_delhi::": {
+    "conversation_id": "conv_generic_trg_010_ipl_match_delhi",
+    "merchant_id": "",
+    "customer_id": null,
+    "send_as": "vera",
+    "trigger_id": "trg_010_ipl_match_delhi",
+    "template_name": "vera_ipl_match_today_v1",
+    "template_params": [
+      "",
+      "Aaj IPL match hai — match nights par orders 20-30% spike karte hain! Aapke views aur calls badh rahe hain par CTR peers",
+      "binary_yes_stop"
+    ],
+    "body": "Aaj IPL match hai — match nights par orders 20-30% spike karte hain! Aapke views aur calls badh rahe hain par CTR peers se niche hai. Kya main aapka active offer aaj ke liye highlight kar doon taaki orders aur badh sakein? Chahiye 🏆",
+    "cta": "binary_yes_stop",
+    "suppression_key": "ipl:generic:2026-04-26",
+    "rationale": "Generic fallback for city-scope IPL trigger without merchant identity.",
     "_cached": true,
     "_self_eval_scores": {}
   }

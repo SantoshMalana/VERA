@@ -33,7 +33,8 @@ def _has_hallucination_marker(body: str) -> bool:
 
 # ── URL ───────────────────────────────────────────────────────────────────────
 _URL_PATTERN = re.compile(
-    r'https?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(com|in|org|net|io|app|co)/[^\s]*',
+    r'https?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(com|in|org|net|io|app|co)/[^\s]*'
+    r'|\[link[^\]]*\]|\[url[^\]]*\]|\[click here[^\]]*\]|\[draft[^\]]*\]|\[post[^\]]*\]',
     re.IGNORECASE,
 )
 

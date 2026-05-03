@@ -1,17 +1,9 @@
 """
-Post-LLM output validation and repair.
+Post-LLM output validation and repair — v2.
 
-Runs a fast, rule-based quality gate on composed messages BEFORE they are
-returned to the judge. If a check fails, it either auto-repairs the output
-or triggers a re-prompt (up to MAX_RETRIES times).
-
-Checks:
-  1. Body is non-empty and has sufficient length
-  2. Body is not verbatim-identical to a previously sent message
-  3. Body contains at least one specific anchor (number, price, %)
-  4. CTA shape matches trigger kind expectations
-  5. No obvious hallucination markers
-  6. send_as is consistent with trigger scope
+Adds:
+  - Compulsion Pre-Filter (Fix 4)
+  - Category Voice Enforcement (Fix 5) with surgical repair
 """
 from __future__ import annotations
 import re
@@ -19,69 +11,47 @@ from typing import Optional, Callable
 
 MAX_RETRIES = 2
 
-# ── Specificity check: body must contain a number, ₹ price, or % ────────────
-_SPECIFICITY_PATTERNS = [
-    r"\d+",           # any number
-    r"₹\s*\d+",       # rupee amount
-    r"\d+\s*%",       # percentage
-    r"\d+\s*star",    # star rating
-    r"\d+\s*review",  # review count
-]
+# ── Specificity ───────────────────────────────────────────────────────────────
+_SPECIFICITY_PATTERNS = [r"\d+", r"₹\s*\d+", r"\d+\s*%", r"\d+\s*star", r"\d+\s*review"]
 _SPECIFICITY_COMPILED = [re.compile(p, re.IGNORECASE) for p in _SPECIFICITY_PATTERNS]
-
 
 def _has_specificity(body: str) -> bool:
     return any(p.search(body) for p in _SPECIFICITY_COMPILED)
 
+def _number_in_first_sentence(body: str) -> bool:
+    first = re.split(r"[.!?।]", body.strip(), maxsplit=1)[0]
+    return bool(re.search(r"\d", first))
 
-# ── Hallucination marker check ───────────────────────────────────────────────
-_HALLUCINATION_MARKERS = [
-    r"\bI checked (online|google|the web)\b",
-    r"\bI found that\b",
-    r"\baccording to my (research|search)\b",
-    r"\bI searched\b",
-    r"\bguaranteed\b",  # taboo for medical categories
-]
-_HALLUCINATION_COMPILED = [re.compile(p, re.IGNORECASE) for p in _HALLUCINATION_MARKERS]
-
+# ── Hallucination ─────────────────────────────────────────────────────────────
+_HALLUCINATION_COMPILED = [re.compile(p, re.IGNORECASE) for p in [
+    r"\bI checked (online|google|the web)\b", r"\bI found that\b",
+    r"\baccording to my (research|search)\b", r"\bI searched\b", r"\bguaranteed\b",
+]]
 
 def _has_hallucination_marker(body: str) -> bool:
     return any(p.search(body) for p in _HALLUCINATION_COMPILED)
 
-
-# ── URL detection (hard fail: -3 penalty per URL) ────────────────────────────
+# ── URL ───────────────────────────────────────────────────────────────────────
 _URL_PATTERN = re.compile(
     r'https?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(com|in|org|net|io|app|co)/[^\s]*',
     re.IGNORECASE,
 )
 
-
 def _has_url(body: str) -> bool:
     return bool(_URL_PATTERN.search(body))
 
-
 def _strip_urls(body: str) -> str:
-    """Remove URLs from body text."""
     return _URL_PATTERN.sub('', body).strip()
 
-
-# ── CTA shape check ───────────────────────────────────────────────────────────
+# ── CTA shape ─────────────────────────────────────────────────────────────────
 _ACTION_TRIGGER_KINDS = {
     "perf_spike", "perf_dip", "festival_upcoming", "competitor_opened",
     "recall_due", "customer_lapsed_soft", "customer_lapsed_hard",
     "regulation_change", "category_trend_movement", "review_theme_emerged",
-    "local_news_event",
+    "local_news_event", "ipl_match_today",
 }
-_INFO_TRIGGER_KINDS = {
-    "research_digest", "research_digest_release",
-    "category_research_digest_release", "milestone_reached",
-    "dormant_with_vera", "scheduled_recurring", "weather_heatwave",
-    "appointment_tomorrow",
-}
-
 
 def _validate_cta(cta: str, trigger_kind: str) -> tuple[bool, str]:
-    """Returns (is_valid, corrected_cta)."""
     if trigger_kind in _ACTION_TRIGGER_KINDS:
         if cta not in ("binary_yes_stop", "open_ended"):
             return False, "binary_yes_stop"
@@ -90,35 +60,152 @@ def _validate_cta(cta: str, trigger_kind: str) -> tuple[bool, str]:
             return False, "none"
     return True, cta
 
-
-# ── Preamble check ────────────────────────────────────────────────────────────
-_PREAMBLE_PATTERNS = [
+# ── Preamble ──────────────────────────────────────────────────────────────────
+_PREAMBLE_COMPILED = [re.compile(p, re.IGNORECASE) for p in [
     r"^I hope (you'?re|you are) (doing well|having a good)",
     r"^Hope (this|the day) finds you",
     r"^Dear (merchant|partner|doctor|owner)",
-    r"^Greetings!",
-    r"^Hello! I am Vera",
-    r"^Hi! I'?m? Vera",
-]
-_PREAMBLE_COMPILED = [re.compile(p, re.IGNORECASE) for p in _PREAMBLE_PATTERNS]
-
+    r"^Greetings!", r"^Hello! I am Vera", r"^Hi! I'?m? Vera",
+    r"^I wanted to reach out", r"^Just checking in",
+]]
 
 def _has_preamble(body: str) -> bool:
     return any(p.search(body.strip()) for p in _PREAMBLE_COMPILED)
 
-
-# ── Length check ──────────────────────────────────────────────────────────────
+# ── Length ────────────────────────────────────────────────────────────────────
 MIN_BODY_LENGTH = 30
 MAX_BODY_LENGTH = 800
+_HIGH_URGENCY_KINDS = {"perf_dip", "competitor_opened", "ipl_match_today", "festival_upcoming"}
+HIGH_URGENCY_SOFT_CAP = 320
+
+# ── Compulsion signals ────────────────────────────────────────────────────────
+_LOSS_AVERSION_COMPILED = [re.compile(p, re.IGNORECASE) for p in [
+    r"\bmiss(ing|ed)?\b", r"\blose\b", r"\blost\b", r"\blosing\b", r"\bgap\b",
+    r"\bbelow (peer|average|median)\b", r"\bdrop(ped|ping)?\b", r"\bfalling\b",
+    r"\bpeeche\b", r"\bgir\b", r"\bkam\b",
+    r"\bopportunity\b", r"\bchance\b",
+    r"\bbefore .{0,20}(close|end|expire)\b",
+    r"\bsirf .{0,10}(din|days?|ghante)\b",
+]]
+
+_WARM_CLOSE_COMPILED = [re.compile(p, re.IGNORECASE | re.UNICODE) for p in [
+    r"\?[\s\S]{0,10}$",          # ? anywhere near the end (allows trailing emoji/space)
+    r"\bYES\b",                   # explicit YES CTA
+    r"\bSTOP\b",                  # explicit STOP CTA
+    r"\breply (1|2|yes|no)\b",   # slot-pick reply
+    r"\bkya kehte\b",             # Hinglish engagement hook
+    r"\bchahiye\b",               # "do you want?" in Hindi
+    r"\bkarein\b",                # "shall we do?" in Hindi
+    r"\bboliye\b",                # "please tell" in Hindi
+    r"\bkar doon\b",              # "shall I do?" in Hindi
+    r"\bbhej doon\b",             # "shall I send?" in Hindi
+    r"\bblock kar doon\b",        # "shall I block?" in Hindi
+    r"\bdraft kar doon\b",        # "shall I draft?" in Hindi
+]]
+
+def _has_loss_aversion(body: str) -> bool:
+    return any(p.search(body) for p in _LOSS_AVERSION_COMPILED)
+
+def _has_warm_close(body: str) -> bool:
+    return any(p.search(body) for p in _WARM_CLOSE_COMPILED)
+
+# ── Category Voice Enforcement ────────────────────────────────────────────────
+_SLUG_NORMALIZE = {
+    "dentist": "dentists", "salon": "salons", "gym": "gyms",
+    "restaurant": "restaurants", "pharmacy": "pharmacies",
+}
+
+_CATEGORY_FORBIDDEN: dict[str, list[tuple[re.Pattern, str]]] = {
+    "dentists": [
+        (re.compile(r"\bcure\b", re.IGNORECASE), "treat"),
+        (re.compile(r"\bguaranteed\b", re.IGNORECASE), "evidence-based"),
+        (re.compile(r"\b100% safe\b", re.IGNORECASE), "clinically reviewed"),
+        (re.compile(r"\bpainless guaranteed\b", re.IGNORECASE), "minimally invasive"),
+        (re.compile(r"\bboost(ing)?\b", re.IGNORECASE), "improve"),
+        (re.compile(r"\bskyrocket\b", re.IGNORECASE), "increase"),
+        (re.compile(r"\bamazing results\b", re.IGNORECASE), "strong outcomes"),
+        (re.compile(r"\bincredible\b", re.IGNORECASE), "notable"),
+    ],
+    "pharmacies": [
+        (re.compile(r"\bcure\b", re.IGNORECASE), "treat"),
+        (re.compile(r"\bguaranteed\b", re.IGNORECASE), "clinically indicated"),
+        (re.compile(r"\b100% safe\b", re.IGNORECASE), "FDA approved"),
+        (re.compile(r"\bmiracl\w*\b", re.IGNORECASE), "effective"),
+    ],
+    "salons": [
+        (re.compile(r"\bclinical trial\b", re.IGNORECASE), "professional treatment"),
+        (re.compile(r"\bpatient\b", re.IGNORECASE), "client"),
+    ],
+    "gyms": [
+        (re.compile(r"\bpatient\b", re.IGNORECASE), "member"),
+        (re.compile(r"\bclinical\b", re.IGNORECASE), "science-backed"),
+    ],
+    "restaurants": [
+        (re.compile(r"\bpatient\b", re.IGNORECASE), "guest"),
+        (re.compile(r"\bclinical\b", re.IGNORECASE), "curated"),
+    ],
+}
+
+_EMOJI_PATTERN = re.compile(
+    "[\U0001F300-\U0001F9FF\U00002600-\U000027BF\U0001FA00-\U0001FA9F]",
+    re.UNICODE,
+)
+_CATEGORY_EMOJI = {
+    "dentists": "🦷", "salons": "💇", "restaurants": "🍽️",
+    "gyms": "💪", "pharmacies": "💊",
+}
 
 
-# ── Main validation function ──────────────────────────────────────────────────
+def _enforce_category_voice(body: str, category_slug: str) -> tuple[str, list[str]]:
+    """Surgical category voice enforcement. Returns (repaired_body, repairs_list)."""
+    repairs = []
+    slug = _SLUG_NORMALIZE.get(category_slug, category_slug)
 
+    for pattern, replacement in _CATEGORY_FORBIDDEN.get(slug, []):
+        new_body, n = pattern.subn(replacement, body)
+        if n > 0:
+            repairs.append(f"Category voice: replaced '{pattern.pattern}' → '{replacement}'")
+            body = new_body
+
+    # Emoji discipline — one approved emoji at the end only
+    approved = _CATEGORY_EMOJI.get(slug)
+    if approved:
+        found = _EMOJI_PATTERN.findall(body)
+        if found:
+            body = _EMOJI_PATTERN.sub("", body).strip().rstrip("!.? ")
+            body = body + f" {approved}"
+            repairs.append(f"Emoji disciplined to single {approved} at end")
+
+    return body, repairs
+
+
+# ── Compulsion score (advisory) ───────────────────────────────────────────────
+def _compulsion_score(body: str, trigger_kind: str, owner_name: str = "") -> dict:
+    score: dict = {}
+    score["number_in_first_sentence"] = _number_in_first_sentence(body)
+    score["loss_aversion"] = _has_loss_aversion(body)
+    score["warm_close"] = _has_warm_close(body)
+    first_words = " ".join(body.split()[:8])
+    score["owner_name_early"] = (
+        bool(owner_name and owner_name.split()[0].lower() in first_words.lower())
+        if owner_name else True
+    )
+    cta_signals = re.findall(
+        r"\b(YES|STOP|reply (1|2|yes|no)|kya kehte|chahiye)\b", body, re.IGNORECASE
+    )
+    score["single_cta"] = len(cta_signals) <= 1
+    if trigger_kind in _HIGH_URGENCY_KINDS:
+        score["urgency_length_ok"] = len(body) <= HIGH_URGENCY_SOFT_CAP
+    return score
+
+
+# ── ValidationResult ──────────────────────────────────────────────────────────
 class ValidationResult:
     def __init__(self):
         self.passed = True
         self.issues: list[str] = []
         self.auto_repaired = False
+        self.compulsion_scores: dict = {}
 
     def fail(self, issue: str):
         self.passed = False
@@ -128,107 +215,102 @@ class ValidationResult:
         self.auto_repaired = True
         self.issues.append(f"[auto-repaired] {issue}")
 
+    def advisory(self, issue: str):
+        self.issues.append(f"[advisory] {issue}")
 
+
+# ── Main ──────────────────────────────────────────────────────────────────────
 def validate_and_repair(
     result: dict,
     trigger_kind: str,
     already_sent_bodies: Optional[list] = None,
     category_slug: str = "",
+    owner_name: str = "",
 ) -> tuple[dict, ValidationResult]:
-    """
-    Validates and auto-repairs a composed message dict.
-    Returns (repaired_result, validation_result).
-    """
     vr = ValidationResult()
     body = result.get("body", "").strip()
     cta = result.get("cta", "open_ended")
 
-    # 1. Empty body
     if not body:
-        vr.fail("Empty body")
-        return result, vr
+        vr.fail("Empty body"); return result, vr
 
-    # 2. Too short
     if len(body) < MIN_BODY_LENGTH:
-        vr.fail(f"Body too short ({len(body)} chars, min {MIN_BODY_LENGTH})")
-        return result, vr
+        vr.fail(f"Body too short ({len(body)} chars)"); return result, vr
 
-    # 3. Too long — truncate gracefully at last sentence boundary
     if len(body) > MAX_BODY_LENGTH:
         truncated = body[:MAX_BODY_LENGTH]
-        # Find last sentence end
-        last_end = max(
-            truncated.rfind("."),
-            truncated.rfind("?"),
-            truncated.rfind("!"),
-        )
+        last_end = max(truncated.rfind("."), truncated.rfind("?"), truncated.rfind("!"))
         if last_end > MAX_BODY_LENGTH // 2:
             body = truncated[:last_end + 1]
             result["body"] = body
-            vr.repair(f"Truncated body from {len(result['body'])} to {len(body)} chars")
+            vr.repair(f"Truncated to {len(body)} chars")
 
-    # 4. Verbatim repeat
     if already_sent_bodies:
-        body_lower = body.lower()
         for prev in already_sent_bodies:
-            if prev.strip().lower() == body_lower:
-                vr.fail("Body is verbatim repeat of previously sent message")
-                return result, vr
+            if prev.strip().lower() == body.lower():
+                vr.fail("Verbatim repeat"); return result, vr
 
-    # 5. Specificity — must contain at least one number/price/%
     if not _has_specificity(body):
-        vr.fail("Body lacks specificity (no numbers, prices, or percentages found)")
-        # Don't return — this is a soft failure, let retry handle it
+        vr.fail("No specificity anchor (numbers/prices/%)")
 
-    # 6. Hallucination markers
     if _has_hallucination_marker(body):
-        vr.fail("Body contains hallucination markers")
-        return result, vr
+        vr.fail("Hallucination marker detected"); return result, vr
 
-    # 6b. URL check — hard fail, -3 penalty per URL
     if _has_url(body):
         cleaned = _strip_urls(body)
         if cleaned and len(cleaned) >= MIN_BODY_LENGTH:
-            result["body"] = cleaned
-            body = cleaned
-            vr.repair("Stripped URLs from body (URLs cause -3 penalty)")
+            result["body"] = cleaned; body = cleaned
+            vr.repair("Stripped URLs")
         else:
-            vr.fail("Body contains URLs which cause a -3 penalty and cannot be safely stripped")
-            return result, vr
+            vr.fail("Unstrippable URLs"); return result, vr
 
-    # 7. Preamble check — auto-repair by stripping preamble sentence
     if _has_preamble(body):
         sentences = re.split(r"(?<=[.!?])\s+", body, maxsplit=1)
         if len(sentences) > 1:
-            body = sentences[1].strip()
-            result["body"] = body
-            vr.repair("Stripped opening preamble sentence")
+            body = sentences[1].strip(); result["body"] = body
+            vr.repair("Stripped preamble")
         else:
-            vr.fail("Body starts with preamble and couldn't be repaired")
+            vr.fail("Unstrippable preamble")
 
-    # 8. CTA shape
+    # Category voice enforcement (surgical)
+    if category_slug:
+        body, cat_repairs = _enforce_category_voice(body, category_slug)
+        result["body"] = body
+        for r in cat_repairs:
+            vr.repair(r)
+
+    # CTA shape
     cta_valid, corrected_cta = _validate_cta(cta, trigger_kind)
     if not cta_valid:
         result["cta"] = corrected_cta
-        vr.repair(f"CTA corrected from '{cta}' to '{corrected_cta}' for trigger kind '{trigger_kind}'")
+        vr.repair(f"CTA '{cta}' → '{corrected_cta}'")
 
-    # 9. Medical category — taboo words
-    medical_categories = {"dentists", "pharmacies", "doctors"}
-    if category_slug in medical_categories:
-        taboo_found = [
-            w for w in ["cure", "guaranteed", "100% safe", "painless guaranteed"]
-            if w.lower() in body.lower()
-        ]
-        if taboo_found:
-            vr.fail(f"Medical taboo words found: {taboo_found}")
-
-    # 10. Multiple CTAs (anti-pattern)
-    yes_no_count = len(re.findall(r"\b(YES|STOP|reply yes|reply no|reply 1|reply 2)\b", body, re.IGNORECASE))
+    # Multiple CTA signals
+    yes_no_count = len(re.findall(
+        r"\b(YES|STOP|reply yes|reply no|reply 1|reply 2)\b", body, re.IGNORECASE
+    ))
     if yes_no_count > 2:
-        vr.fail("Multiple CTAs detected in body")
+        vr.fail("Multiple CTA signals")
 
-    # Final: if all critical checks passed (only soft failures remain), mark passed
-    critical_failures = [i for i in vr.issues if not i.startswith("[auto-repaired]")]
+    # Medical taboo (post-repair check)
+    if category_slug in {"dentists", "pharmacies", "doctors"}:
+        taboo = [w for w in ["cure", "guaranteed", "100% safe"] if w.lower() in body.lower()]
+        if taboo:
+            vr.fail(f"Medical taboo after repair: {taboo}")
+
+    # Compulsion advisory
+    comp = _compulsion_score(body, trigger_kind, owner_name)
+    vr.compulsion_scores = comp
+    if not comp.get("number_in_first_sentence"):
+        vr.advisory("No number in first sentence")
+    _WARM_CLOSE_EXEMPT = {"appointment_tomorrow", "none", "chronic_refill_due", "trial_followup", "wedding_package_followup"}
+    if not comp.get("warm_close") and trigger_kind not in _WARM_CLOSE_EXEMPT:
+        vr.fail("No warm close — message must end with a question or YES/STOP CTA")
+    if trigger_kind in _HIGH_URGENCY_KINDS and not comp.get("urgency_length_ok", True):
+        vr.advisory(f"High-urgency body {len(body)} chars > {HIGH_URGENCY_SOFT_CAP} soft cap")
+
+    critical_failures = [i for i in vr.issues
+                         if not i.startswith("[auto-repaired]") and not i.startswith("[advisory]")]
     if not critical_failures:
         vr.passed = True
 
@@ -241,33 +323,14 @@ def validate_with_retry(
     already_sent_bodies: Optional[list] = None,
     category_slug: str = "",
 ) -> dict:
-    """
-    Calls compose_fn(), validates, and retries up to MAX_RETRIES times if
-    validation fails on critical issues.
-    Returns the best result found.
-    """
     last_result = None
-    last_vr = None
-
-    for attempt in range(1 + MAX_RETRIES):
+    for _ in range(1 + MAX_RETRIES):
         result = compose_fn()
         repaired, vr = validate_and_repair(
-            result,
-            trigger_kind=trigger_kind,
-            already_sent_bodies=already_sent_bodies,
-            category_slug=category_slug,
+            result, trigger_kind=trigger_kind,
+            already_sent_bodies=already_sent_bodies, category_slug=category_slug,
         )
-
         if vr.passed:
             return repaired
-
         last_result = repaired
-        last_vr = vr
-
-        if attempt < MAX_RETRIES:
-            # Inject validation issues into the compose_fn on next call
-            # (compose_fn should accept an optional hint; if not, just retry)
-            pass
-
-    # Return best effort even if validation failed
     return last_result or {}

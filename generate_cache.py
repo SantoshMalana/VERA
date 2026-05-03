@@ -157,9 +157,12 @@ def generate_all(target_merchant: str = None, force: bool = False) -> None:
             customer_id = trigger.get("customer_id") or trigger.get("payload", {}).get("customer_id")
             customer = store.get("customer", customer_id) if customer_id else None
 
+            customer_id = trigger.get("customer_id") or trigger.get("payload", {}).get("customer_id")
+            customer = store.get("customer", customer_id) if customer_id else None
+
             logger.info("Generating: %s → %s", tid, mid)
             try:
-                result = compose_message(category, merchant, trigger, customer)
+                result = compose_message(category, merchant, trigger, customer, use_tournament=not args.fast)
 
                 identity = merchant.get("identity", {})
                 owner_name = identity.get("owner_first_name", identity.get("name", ""))
@@ -194,18 +197,17 @@ def generate_all(target_merchant: str = None, force: bool = False) -> None:
 
 def review_cache() -> None:
     """Print all cached responses for human review."""
-    from submission_cache import _cache, _loaded
-    if not _loaded:
-        from submission_cache import _load_cache
-        _load_cache()
+    import submission_cache
+    if not submission_cache._loaded:
+        submission_cache._load_cache()
 
     print(f"\n{'='*60}")
-    print(f"CACHED RESPONSES ({len(_cache)} total)")
+    print(f"CACHED RESPONSES ({len(submission_cache._cache)} total)")
     print(f"{'='*60}")
 
-    for key, action in sorted(_cache.items()):
+    for key, action in sorted(submission_cache._cache.items()):
         trigger_id, merchant_id = key.split("::", 1)
-        print(f"\n{'─'*60}")
+        print(f"\n{'-'*60}")
         print(f"TRIGGER: {trigger_id}")
         print(f"MERCHANT: {merchant_id}")
         print(f"CTA: {action.get('cta', '')}")
@@ -222,12 +224,61 @@ def review_cache() -> None:
     print(f"To edit: open submission_cache.json and modify 'body' fields")
     print(f"{'='*60}\n")
 
+def prewarm_trigger(trigger: dict) -> None:
+    """Background task to pre-generate a trigger."""
+    from contexts import store
+    tid = trigger.get("trigger_id")
+    mid = trigger.get("merchant_id")
+    if not tid or not mid:
+        return
+        
+    merchant, category = store.get_merchant_with_category(mid)
+    if not merchant or not category:
+        return
+        
+    customer_id = trigger.get("customer_id") or trigger.get("payload", {}).get("customer_id")
+    customer = store.get("customer", customer_id) if customer_id else None
+    
+    from submission_cache import _cache_key, _cache
+    if _cache_key(tid, mid) in _cache:
+        return # already cached
+        
+    try:
+        from composer import compose_message
+        result = compose_message(category, merchant, trigger, customer, use_tournament=True)
+            
+        identity = merchant.get("identity", {})
+        owner_name = identity.get("owner_first_name", identity.get("name", ""))
+        trigger_kind = trigger.get("kind", "generic")
+
+        action = {
+            "conversation_id": f"conv_{mid}_{tid}",
+            "merchant_id": mid,
+            "customer_id": customer.get("customer_id") if customer else None,
+            "send_as": result.get("send_as", "vera"),
+            "trigger_id": tid,
+            "template_name": f"vera_{trigger_kind}_v1",
+            "template_params": [owner_name, result.get("body", "")[:120], result.get("cta", "open_ended")],
+            "body": result.get("body", ""),
+            "cta": result.get("cta", "open_ended"),
+            "suppression_key": trigger.get("suppression_key", f"auto:{tid}"),
+            "rationale": result.get("rationale", ""),
+            "_cached": True,
+            "_self_eval_scores": result.get("self_eval_scores", {}),
+        }
+        save_response(tid, mid, action)
+        logger.info("Pre-warmed trigger %s for %s", tid, mid)
+    except Exception as exc:
+        logger.error("Failed to prewarm %s → %s: %s", tid, mid, exc)
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate Vera submission cache")
     parser.add_argument("--review", action="store_true", help="Show all cached responses")
     parser.add_argument("--merchant", help="Only generate for this merchant_id")
     parser.add_argument("--force", action="store_true", help="Regenerate even if cached")
+    parser.add_argument("--fast", action="store_true", help="Disable tournament for faster generation")
     args = parser.parse_args()
 
     if args.review:

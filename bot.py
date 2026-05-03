@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -127,7 +127,7 @@ async def metadata():
 
 
 @app.post("/v1/context")
-async def push_context(body: ContextBody):
+async def push_context(body: ContextBody, background_tasks: BackgroundTasks):
     valid_scopes = {"category", "merchant", "customer", "trigger"}
     if body.scope not in valid_scopes:
         return JSONResponse(
@@ -146,6 +146,10 @@ async def push_context(body: ContextBody):
                 "current_version": result["current_version"],
             },
         )
+
+    if body.scope == "trigger":
+        from generate_cache import prewarm_trigger
+        background_tasks.add_task(prewarm_trigger, body.payload)
 
     logger.info("Stored %s/%s v%d", body.scope, body.context_id, body.version)
     return {
@@ -206,6 +210,7 @@ async def reply(body: ReplyBody):
         conv_id=body.conversation_id,
         merchant_id=body.merchant_id or "",
         customer_id=body.customer_id,
+        from_role=body.from_role,
         message=body.message,
         turn_number=body.turn_number,
         store=store,

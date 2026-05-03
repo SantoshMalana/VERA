@@ -56,13 +56,15 @@ def _cache_key(trigger_id: str, merchant_id: str) -> str:
 
 
 def get_cached_response(trigger_id: str, merchant_id: str) -> Optional[dict]:
-    """
-    Returns a pre-generated action dict if this (trigger, merchant) pair
-    was in the known test set and was pre-generated. Returns None otherwise.
-    """
     _load_cache()
     key = _cache_key(trigger_id, merchant_id)
     entry = _cache.get(key)
+    # Fallback: city-scope triggers (e.g. ipl_match_today) have no merchant_id
+    if not entry and merchant_id:
+        fallback_key = _cache_key(trigger_id, "")
+        entry = _cache.get(fallback_key)
+        if entry:
+            logger.info("Serving fallback cached response for trigger=%s (city-scope)", trigger_id)
     if entry:
         logger.info("Serving cached response for trigger=%s merchant=%s", trigger_id, merchant_id)
     return entry

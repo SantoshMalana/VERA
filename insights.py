@@ -350,3 +350,74 @@ def derive_insights(merchant: dict, category: dict, trigger: dict) -> dict:
             }
 
     return insights
+
+# ── Merchant DNA Extraction ────────────────────────────────────────────────────
+
+def extract_merchant_dna(merchant: dict, category: dict = None) -> dict:
+    """
+    Extract a compact DNA profile for the merchant.
+    Called during context ingestion (store.store scope=merchant).
+    `category` may be passed directly; if not provided, we build without it.
+    """
+    dna = {}
+
+    # 1. Owner Address
+    identity = merchant.get("identity", {})
+    category_slug = merchant.get("category_slug", "")
+    name = identity.get("owner_first_name") or identity.get("name", "there")
+    if category_slug == "dentists" and not name.startswith("Dr."):
+        dna["owner_address"] = f"Dr. {name}"
+    else:
+        dna["owner_address"] = name
+
+    # 2. Language Mode
+    languages = identity.get("languages", ["en"])
+    dna["language_mode"] = "hinglish" if "hi" in languages else "english"
+
+    # 3. Category Voice
+    voice_map = {
+        "dentists": "clinical-peer",
+        "pharmacies": "clinical-peer",
+        "salons": "sensory-visual",
+        "gyms": "energetic-transformational",
+        "restaurants": "warm-local"
+    }
+    dna["category_voice"] = voice_map.get(category_slug, "professional")
+
+    # 4. Top Offer (from merchant's own offers)
+    active_offers = [o for o in merchant.get("offers", []) if o.get("status") == "active"]
+    if active_offers:
+        o = active_offers[0]
+        price = o.get("price") or o.get("value") or ""
+        dna["top_offer"] = f"{o.get('title', '')} @ ₹{price}" if price else o.get("title", "")
+    else:
+        dna["top_offer"] = ""
+
+    # 5. Best Hook (CTR vs peer) — needs category, skip gracefully if unavailable
+    if category:
+        ctr_info = ctr_vs_peer(merchant, category)
+        if ctr_info:
+            dna["best_hook"] = (
+                f"CTR {ctr_info.get('merchant_ctr')}% vs peer {ctr_info.get('peer_ctr')}% "
+                f"= {ctr_info.get('gap_pct')}% {ctr_info.get('gap_direction')}"
+            )
+        else:
+            dna["best_hook"] = ""
+
+        # 6. Urgency Trigger (Lapsed Revenue)
+        lapsed = lapsed_revenue_opportunity(merchant, category)
+        dna["urgency_trigger"] = lapsed.get("summary", "") if lapsed else ""
+
+        # 7. Seasonal Window
+        seasonal = seasonal_relevance(category)
+        if seasonal and seasonal.get("active_beats"):
+            beat = seasonal["active_beats"][0]
+            dna["seasonal_window"] = f"active: {beat.get('note')} ({beat.get('range')})"
+        else:
+            dna["seasonal_window"] = "none"
+    else:
+        dna["best_hook"] = ""
+        dna["urgency_trigger"] = ""
+        dna["seasonal_window"] = "none"
+
+    return dna

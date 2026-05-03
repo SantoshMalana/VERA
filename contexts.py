@@ -26,6 +26,15 @@ class ContextStore:
             existing = self._store.get(key)
             if existing and existing["version"] >= version:
                 return {"accepted": False, "current_version": existing["version"]}
+            
+            # --- Merchant DNA Extraction (with category if already stored) ---
+            if scope == "merchant":
+                from insights import extract_merchant_dna
+                category_slug = payload.get("category_slug", "")
+                cat_entry = self._store.get(("category", category_slug))
+                cat_payload = cat_entry["payload"] if cat_entry else None
+                payload["_dna"] = extract_merchant_dna(payload, category=cat_payload)
+
             self._store[key] = {"version": version, "payload": payload}
             return {"accepted": True}
 

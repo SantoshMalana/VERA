@@ -119,6 +119,9 @@ ABSOLUTE RULES:
 7. No preambles. No "I hope you're doing well." Start with the hook.
 8. After the first message, never re-introduce yourself.
 9. Never repeat verbatim a message already sent in this conversation.
+10. EMOJI DISCIPLINE: Use at most ONE emoji per message, placed at the very end.
+11. RHYTHM: Follow a strict rhythm: Short hook → Data fact → Short context → CTA.
+12. WARM CLOSE: End the message with a conversational, warm closing question or CTA (e.g., 'kya kehte?', 'chahiye?').
 
 COMPULSION LEVERS (use 1-2 per message — pick what fits the trigger):
 - Specificity: real number, date, source citation
@@ -146,6 +149,7 @@ REPLY_SYSTEM_PROMPT = f"""You are Vera's reply engine. Given a conversation hist
 
 DECISION RULES (follow in order):
 1. Merchant accepted (yes / haan / go / chalo / bilkul / let's do it / ok) → action: "send", SWITCH TO ACTION MODE — do the thing, do NOT re-qualify.
+1b. If acting as merchant replying to customer and they pick a slot/offer → action: "send", confirm it nicely using their name.
 2. Merchant asked a question → action: "send", answer concisely with a context fact.
 3. Merchant said no / stop / not interested → action: "send" one polite closing line, then the conversation ends.
 4. WhatsApp Business auto-reply detected → action: "send" ONE push to reach the real owner.
@@ -282,7 +286,7 @@ def _call_gemini_flash(system_prompt: str, user_prompt: str, temperature: float 
 def _self_eval_and_improve(result: dict, context_summary: str) -> dict:
     """
     Run a self-evaluation pass on the composed message.
-    If any dimension scores < 7, get a rewrite.
+    If any dimension scores < 7, get a rewrite that uses the full context.
     Uses Gemini 2.5 Flash at temp=0 (deterministic grading, massive quota).
     Returns the (possibly improved) result dict.
     """
@@ -293,24 +297,36 @@ def _self_eval_and_improve(result: dict, context_summary: str) -> dict:
     eval_prompt = f"""MESSAGE TO EVALUATE:
 "{body}"
 
-MERCHANT CONTEXT SUMMARY:
+MERCHANT CONTEXT (use these facts if rewriting):
 {context_summary}
 
-Score this message and rewrite if any dimension < 7."""
+Score this message on each dimension. If ANY dimension < 7, rewrite the message using the
+SPECIFIC facts in the merchant context above — merchant name, real numbers, real offers, real ₹ prices.
+The rewrite must NOT be generic. It must contain at least one specific number or ₹ amount from context."""
 
     try:
         eval_result = _call_gemini_flash(_SELF_EVAL_SYSTEM, eval_prompt, temperature=0.0)
 
+        if "scores" in eval_result:
+            result["self_eval_scores"] = eval_result["scores"]
+
         if not eval_result.get("passes", True):
             rewritten = eval_result.get("rewritten_body", "").strip()
             if rewritten and len(rewritten) > 20:
-                logger.info(
-                    "Self-eval improved message. Weaknesses: %s",
-                    eval_result.get("weaknesses", [])
-                )
-                result = dict(result)
-                result["body"] = rewritten
-                result["self_eval_scores"] = eval_result.get("scores", {})
+                # Validate rewrite is actually more specific than original
+                import re as _re
+                orig_nums = len(_re.findall(r"\d+", body))
+                new_nums = len(_re.findall(r"\d+", rewritten))
+                if new_nums >= orig_nums:  # only accept if at least as specific
+                    logger.info(
+                        "Self-eval improved message. Weaknesses: %s",
+                        eval_result.get("weaknesses", [])
+                    )
+                    result = dict(result)
+                    result["body"] = rewritten
+                    result["self_eval_scores"] = eval_result.get("scores", {})
+                else:
+                    logger.info("Self-eval rewrite was less specific — keeping original")
 
     except Exception as exc:
         # Self-eval is best-effort — never block the main flow
@@ -346,6 +362,68 @@ def compose(user_prompt: str, context_summary: str = "") -> dict:
         result = _self_eval_and_improve(result, context_summary)
 
     return result
+
+def compose_tournament(user_prompt: str, context_summary: str, num_variants: int = 5) -> dict:
+    """
+    Generate multiple variants at high temperature, score them all, pick the best,
+    then do a final 10/10 Critic rewrite pass.
+    """
+    variants = []
+    temperatures = [0.4, 0.6, 0.7, 0.8, 0.9]
+
+    for i in range(min(num_variants, len(temperatures))):
+        try:
+            temp = temperatures[i]
+            if _G3_KEYS:
+                variant = _call_gemini3(VERA_SYSTEM_PROMPT, user_prompt, temperature=temp)
+            else:
+                variant = _call_gemini_flash(VERA_SYSTEM_PROMPT, user_prompt, temperature=temp)
+                
+            # Score it
+            evaluated = _self_eval_and_improve(variant, context_summary)
+            
+            scores = evaluated.get("self_eval_scores", {})
+            total_score = sum(scores.values()) if scores else 0
+            
+            variants.append((total_score, evaluated))
+        except Exception as exc:
+            logger.warning("Variant generation %d failed: %s", i+1, exc)
+            
+    if not variants:
+        return compose(user_prompt, context_summary)
+        
+    # Pick winner
+    variants.sort(key=lambda x: x[0], reverse=True)
+    best_score, winner = variants[0]
+    logger.info("Tournament winner selected with score %d/50", best_score)
+    
+    # 10/10 Critic Pass
+    critic_prompt = f"""You are the ultimate 10/10 Critic.
+We have a winner from the tournament. Here is the message:
+"{winner.get('body', '')}"
+
+CONTEXT:
+{context_summary}
+
+If this message is already a perfect 50/50 (highly specific, perfect tone, irresistible compulsion), return it exactly as is.
+Otherwise, rewrite it to be the absolute BEST version of itself. Maximize specificity, hook, and category fit.
+Keep the same CTA and core action.
+
+Return ONLY valid JSON:
+{{
+  "body": "<the 10/10 rewritten message>"
+}}"""
+    try:
+        critic_res = _call_gemini3(_SELF_EVAL_SYSTEM, critic_prompt, temperature=0.2)
+        final_body = critic_res.get("body", "").strip()
+        if final_body and len(final_body) > 20:
+            winner["body"] = final_body
+            logger.info("10/10 Critic pass applied.")
+    except Exception as exc:
+        logger.warning("10/10 Critic pass failed: %s", exc)
+
+    return winner
+
 
 
 def reply(user_prompt: str) -> dict:

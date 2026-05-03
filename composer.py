@@ -184,6 +184,117 @@ _KIND_STRATEGIES: dict[str, dict] = {
         ),
         "cta_hint": "open_ended",
     },
+    "ipl_match_today": {
+        "angle": (
+            "IPL match is happening today in the merchant's city. "
+            "Lead with the exact team playing (from trigger payload). "
+            "Frame as a local footfall opportunity — IPL evenings drive "
+            "delivery/dine-in/salon appointments. Suggest ONE specific "
+            "action: run a match-night offer. LEVER: TIMELINESS + SPECIFICITY."
+        ),
+        "cta_hint": "binary_yes_stop",
+    },
+    "renewal_due": {
+        "angle": (
+            "Subscription is expiring in X days (use exact days_remaining from payload). "
+            "Lead with the SPECIFIC renewal amount (₹ from payload). Frame as protecting "
+            "what's already working — don't let momentum die. "
+            "LEVER: LOSS AVERSION + SPECIFICITY."
+        ),
+        "cta_hint": "binary_yes_stop",
+    },
+    "winback_eligible": {
+        "angle": (
+            "Merchant's subscription lapsed X days ago (use exact days_since_expiry). "
+            "Lead with a concrete loss they've incurred: lapsed_customers_added_since_expiry "
+            "customers have gone uncontacted. Frame as recoverable NOW. "
+            "LEVER: LOSS AVERSION + SPECIFICITY."
+        ),
+        "cta_hint": "binary_yes_stop",
+    },
+    "supply_alert": {
+        "angle": (
+            "Drug/product recall alert. Lead with the exact molecule name and affected batch "
+            "numbers from the payload. Clinical-peer tone — never alarmist. "
+            "Offer to help identify affected stock. LEVER: RECIPROCITY + URGENCY."
+        ),
+        "cta_hint": "open_ended",
+    },
+    "chronic_refill_due": {
+        "angle": (
+            "Customer's chronic medications are running out (use exact stock_runs_out date). "
+            "Message FROM the pharmacy TO the customer. List their specific molecules. "
+            "Offer delivery if address_saved=true. LEVER: EFFORT EXTERNALIZATION + URGENCY."
+        ),
+        "cta_hint": "binary_yes_stop",
+    },
+    "category_seasonal": {
+        "angle": (
+            "Seasonal demand shift with exact % changes from payload trends list. "
+            "Name the top 2 demand spikes with their percentages. Suggest ONE shelf action. "
+            "LEVER: SPECIFICITY + TIMELINESS."
+        ),
+        "cta_hint": "binary_yes_stop",
+    },
+    "gbp_unverified": {
+        "angle": (
+            "Google Business Profile is unverified. Lead with the specific uplift estimate "
+            "(estimated_uplift_pct from payload as a %). Frame as free money left on table. "
+            "Offer to walk them through the verification path. LEVER: LOSS AVERSION + SPECIFICITY."
+        ),
+        "cta_hint": "binary_yes_stop",
+    },
+    "cde_opportunity": {
+        "angle": (
+            "Continuing education webinar/opportunity. Lead with credit count and fee "
+            "(use exact values from payload). Clinical-peer tone. "
+            "Frame as a 2-minute commitment for professional value. LEVER: CURIOSITY + RECIPROCITY."
+        ),
+        "cta_hint": "open_ended",
+    },
+    "trial_followup": {
+        "angle": (
+            "Customer completed a trial — follow up with the NEXT concrete step. "
+            "Message from merchant to customer. Use their name, the trial date, "
+            "and the next available slot from next_session_options. "
+            "LEVER: EFFORT EXTERNALIZATION + SPECIFICITY."
+        ),
+        "cta_hint": "binary_yes_stop",
+    },
+    "wedding_package_followup": {
+        "angle": (
+            "Bridal customer has a wedding coming (use exact days_to_wedding). "
+            "Message from merchant to customer. Reference the next_step_window_open "
+            "as a time-sensitive action. Warm, personal, specific. "
+            "LEVER: URGENCY + SPECIFICITY."
+        ),
+        "cta_hint": "binary_yes_stop",
+    },
+    "active_planning_intent": {
+        "angle": (
+            "Merchant already said yes and gave a specific topic (use merchant_last_message). "
+            "This is ACTION MODE — do NOT re-qualify. Give them a concrete first step, "
+            "a draft, or an outline. LEVER: EFFORT EXTERNALIZATION."
+        ),
+        "cta_hint": "open_ended",
+    },
+    "curious_ask_due": {
+        "angle": (
+            "Ask the merchant one genuine, curiosity-driven question about their business. "
+            "Base it on the ask_template from payload. Short, conversational, no sales pitch. "
+            "LEVER: CURIOSITY + ASKING THE MERCHANT."
+        ),
+        "cta_hint": "open_ended",
+    },
+    "seasonal_perf_dip": {
+        "angle": (
+            "Performance dipped (use exact delta_pct from payload) but it's expected seasonal. "
+            "Acknowledge the seasonality (use season_note), then offer ONE proactive action "
+            "to minimize the dip vs competitors. Frame positively — not doom. "
+            "LEVER: SOCIAL PROOF + EFFORT EXTERNALIZATION."
+        ),
+        "cta_hint": "binary_yes_stop",
+    },
 }
 
 _DEFAULT_STRATEGY = {
@@ -213,6 +324,14 @@ def _trigger_priority(trigger: dict) -> int:
         "customer_lapsed_hard": 2,
         "customer_lapsed_soft": 1,
         "review_theme_emerged": 1,
+        "renewal_due": 4,
+        "supply_alert": 5,
+        "active_planning_intent": 4,
+        "winback_eligible": 2,
+        "gbp_unverified": 2,
+        "chronic_refill_due": 3,
+        "trial_followup": 2,
+        "wedding_package_followup": 2,
     }.get(kind, 0)
     return urgency + kind_bonus
 
@@ -354,6 +473,31 @@ def _build_prompt(
     if owner_name:
         owner_note = f"\nIMPORTANT — Address the merchant by their OWNER FIRST NAME: '{owner_name}' (e.g. 'Dr. Meera', 'Suresh', 'Lakshmi'). Do NOT use the full business name as the greeting.\n"
 
+    # Compulsion injection — pre-compute the best loss-aversion hook from insights
+    ctr_data = insights.get("ctr_analysis", {})
+    lapsed_data = insights.get("lapsed_revenue", {})
+    perf_delta = insights.get("performance_delta", {})
+    compulsion_note = ""
+    compulsion_parts = []
+    if ctr_data.get("is_below_peer"):
+        compulsion_parts.append(
+            f"CTR LOSS: merchant CTR {ctr_data.get('merchant_ctr')}% is "
+            f"{ctr_data.get('gap_pct')}% below peer {ctr_data.get('peer_ctr')}% — USE THIS AS LOSS-AVERSION HOOK"
+        )
+    if lapsed_data.get("opportunity_inr"):
+        compulsion_parts.append(
+            f"REVENUE AT RISK: {lapsed_data.get('lapsed_count')} lapsed customers = "
+            f"₹{lapsed_data.get('opportunity_inr'):,} recoverable — MENTION THIS SPECIFIC NUMBER"
+        )
+    if perf_delta.get("summary"):
+        compulsion_parts.append(f"PERFORMANCE DELTA: {perf_delta['summary']} — USE EXACT NUMBERS")
+    if compulsion_parts:
+        compulsion_note = (
+            "\n\n⚡ COMPULSION INJECTION — Your message MUST use at least ONE of these specific facts:\n"
+            + "\n".join(f"  • {p}" for p in compulsion_parts)
+            + "\nDo NOT produce a generic message. These are real numbers — anchor on them.\n"
+        )
+
     return f"""TASK: Compose the next WhatsApp message for {merchant_name} ({category_slug}).
 
 TRIGGER KIND: {trigger_kind}
@@ -362,7 +506,7 @@ LANGUAGE: {lang_note}
 PREFERRED CTA: {strategy['cta_hint']}
 
 ANGLE FOR THIS TRIGGER:
-{strategy['angle']}{owner_note}{digest_note}
+{strategy['angle']}{owner_note}{digest_note}{compulsion_note}
 --- PRE-COMPUTED INSIGHTS (use these facts to anchor your message) ---
 {insights_str}
 
@@ -387,6 +531,7 @@ def compose_message(
     customer: Optional[dict] = None,
     already_sent_bodies: Optional[list] = None,
     active_conversation_turns: Optional[list] = None,
+    use_tournament: bool = False,
 ) -> dict:
     """
     Builds prompt, calls Gemini, validates output, retries on failure.
@@ -404,13 +549,29 @@ def compose_message(
             already_sent_bodies, validation_hint,
         )
         try:
-            # Build a short context summary for self-eval
+            # Build rich context summary for self-eval — include real numbers and offers
+            perf = merchant.get("performance", {})
+            agg = merchant.get("customer_aggregate", {})
+            active_offers = [o for o in merchant.get("offers", []) if o.get("status") == "active"]
+            offer_str = active_offers[0].get("title", "") if active_offers else ""
+            offer_price = active_offers[0].get("price") or active_offers[0].get("value", "") if active_offers else ""
+            owner_name = merchant.get("identity", {}).get("owner_first_name", merchant_name.split()[0])
+            peer_ctr = category.get("peer_stats", {}).get("avg_ctr", 0)
+            m_ctr = perf.get("ctr") or perf.get("ctr_30d", 0)
+            lapsed = agg.get("lapsed_180d_plus") or agg.get("lapsed_count", 0)
             context_summary = (
-                f"Category: {category_slug}, Merchant: {merchant_name}, "
+                f"Merchant: {merchant_name} (owner: {owner_name}), Category: {category_slug}, "
+                f"City: {merchant.get('identity', {}).get('city', '')}, "
                 f"Trigger: {trigger_kind}, "
+                f"CTR: {round(m_ctr*100,1) if m_ctr else 'N/A'}% vs peer {round(peer_ctr*100,1) if peer_ctr else 'N/A'}%, "
+                f"Active offer: '{offer_str}' @ ₹{offer_price}, "
+                f"Lapsed customers: {lapsed}, "
                 f"Signals: {merchant.get('signals', [])[:3]}"
             )
-            result = llm_engine.compose(prompt, context_summary=context_summary)
+            if use_tournament:
+                result = llm_engine.compose_tournament(prompt, context_summary=context_summary)
+            else:
+                result = llm_engine.compose(prompt, context_summary=context_summary)
         except Exception as exc:
             logger.error(
                 "LLM call failed for %s/%s (attempt %d): %s",
@@ -473,28 +634,57 @@ def select_and_compose(
             logger.debug("Skipping suppressed trigger: %s", trg_id)
             continue
 
-        # Skip expired triggers
+        # NOTE: We trust the judge's available_triggers list.
+        # If the judge says it's active, we fire it — don't second-guess with expires_at.
         expires_at = trigger.get("expires_at")
         if expires_at:
             try:
                 from datetime import datetime, timezone
                 exp_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
                 if exp_dt < datetime.now(timezone.utc):
-                    logger.debug("Skipping expired trigger: %s", trg_id)
-                    continue
+                    logger.info("Trigger %s is past expires_at but judge listed it — firing anyway", trg_id)
             except (ValueError, TypeError):
                 pass
 
+        logger.info("ipl trigger payload: %s", trigger.get("payload", {}))
         merchant_id = (
             trigger.get("merchant_id")
             or trigger.get("payload", {}).get("merchant_id")
+            or trigger.get("payload", {}).get("payload", {}).get("merchant_id")
         )
-        # Some triggers nest payload inside payload (from /v1/context wrapping)
+
+        # ── City-scope broadcast (e.g. ipl_match_today has no merchant_id) ──
         if not merchant_id:
-            inner_payload = trigger.get("payload", {})
-            if isinstance(inner_payload, dict):
-                merchant_id = inner_payload.get("payload", {}).get("merchant_id") if isinstance(inner_payload.get("payload"), dict) else None
-        if not merchant_id:
+            trigger_kind = trigger.get("kind", "")
+            city = (
+                trigger.get("payload", {}).get("city")
+                or trigger.get("payload", {}).get("location", {}).get("city", "")
+            )
+            if city or trigger_kind in ("ipl_match_today", "weather_heatwave", "local_news_event"):
+                # Fan out to all merchants in this city (up to 5 per city-scope trigger)
+                all_merchants = store.get_all("merchant")
+                city_lower = city.lower() if city else ""
+                matched = []
+                for m in all_merchants:
+                    m_city = m.get("identity", {}).get("city", "").lower()
+                    if not city_lower or m_city == city_lower:
+                        matched.append(m)
+                matched = matched[:5]  # cap per trigger
+                if matched:
+                    logger.info("City-scope trigger %s (%s) → %d merchants", trg_id, city or "any", len(matched))
+                    for m in matched:
+                        m_id = m.get("merchant_id", "")
+                        cat_slug = m.get("category_slug", "")
+                        cat = store.get("category", cat_slug)
+                        if m_id and cat:
+                            cust_id = trigger.get("customer_id") or trigger.get("payload", {}).get("customer_id")
+                            cust = store.get_customer(cust_id) if cust_id else None
+                            priority = _trigger_priority(trigger)
+                            candidates.append((priority, trg_id, trigger, m, cat, cust))
+                else:
+                    logger.warning("City-scope trigger %s: no merchants found for city '%s'", trg_id, city)
+            else:
+                logger.warning("Trigger %s has no merchant_id and no city scope — skipping", trg_id)
             continue
 
         merchant, category = store.get_merchant_with_category(merchant_id)
@@ -512,7 +702,6 @@ def select_and_compose(
         candidates.append((priority, trg_id, trigger, merchant, category, customer))
 
     candidates.sort(key=lambda x: x[0], reverse=True)
-    candidates = candidates[:20]
 
     actions = []
     for _, trg_id, trigger, merchant, category, customer in candidates:

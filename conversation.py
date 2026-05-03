@@ -94,6 +94,11 @@ class ConversationManager:
         if conv:
             conv["turns"].append({"from": "vera", "msg": body})
 
+    def record_customer_turn(self, conv_id: str, body: str) -> None:
+        conv = self._convs.get(conv_id)
+        if conv:
+            conv["turns"].append({"from": "customer", "msg": body})
+
     def record_merchant_turn(self, conv_id: str, body: str) -> None:
         conv = self._convs.get(conv_id)
         if conv:
@@ -108,11 +113,280 @@ class ConversationManager:
         conv = self._convs.get(conv_id, {})
         return [t["msg"] for t in conv.get("turns", []) if t.get("from") == "vera"]
 
+    def _calculate_heat_score(self, conv: dict, message: str, intent: str, merchant_info: dict) -> dict:
+        """
+        Calculates conversation heat metrics to adjust LLM aggression.
+        Returns: {
+            "unanswered_count": int,
+            "owner_name_used": bool,
+            "question_asked": bool,
+            "aggression_level": "cold" | "warm" | "hot" | "answer_first"
+        }
+        """
+        turns = conv.get("turns", [])
+        
+        # 1. Unanswered Count
+        unanswered_count = 0
+        for t in reversed(turns):
+            if t["from"] == "vera":
+                unanswered_count += 1
+            else:
+                break
+                
+        # 2. Name Used
+        owner_name = merchant_info.get("owner_first_name", "")
+        owner_name_used = False
+        if owner_name and owner_name.lower() in message.lower():
+            owner_name_used = True
+            
+        # 3. Question Asked
+        question_asked = (intent == "question")
+        
+        # Determine aggression
+        if question_asked:
+            agg = "answer_first"
+        elif owner_name_used or intent == "accept":
+            agg = "hot"
+        elif unanswered_count > 1:
+            agg = "cold"
+        else:
+            agg = "warm"
+            
+        return {
+            "unanswered_count": unanswered_count,
+            "owner_name_used": owner_name_used,
+            "question_asked": question_asked,
+            "aggression_level": agg
+        }
+
+    # ── Slot Confirmation Engine ─────────────────────────────────────────────
+    _DAY_PATTERN = re.compile(
+        r"\b(mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\b",
+        re.IGNORECASE,
+    )
+    _DATE_PATTERN = re.compile(
+        r"\b(\d{1,2})\s*(?:st|nd|rd|th)?\s*"
+        r"(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+        r"jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b",
+        re.IGNORECASE,
+    )
+    _TIME_PATTERN = re.compile(
+        r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b",
+        re.IGNORECASE,
+    )
+    _SLOT_DIGIT_PATTERN = re.compile(r"\breply\s*([12])\b|\boption\s*([12])\b", re.IGNORECASE)
+    _CUSTOMER_STOP_PATTERN = re.compile(
+        r"\b(stop|no|nahi|nahin|cancel|not interested|unsubscribe|mat karo)\b", re.IGNORECASE
+    )
+
+    def _extract_slot(self, message: str) -> Optional[dict]:
+        """Deterministically extract booking slot. Returns dict or None."""
+        slot = {}
+        day_m = self._DAY_PATTERN.search(message)
+        if day_m:
+            slot["day"] = day_m.group(1).capitalize()
+        date_m = self._DATE_PATTERN.search(message)
+        if date_m:
+            slot["date"] = f"{date_m.group(1)} {date_m.group(2).capitalize()}"
+        time_m = self._TIME_PATTERN.search(message)
+        if time_m:
+            hour = time_m.group(1)
+            minute = time_m.group(2) or "00"
+            meridiem = time_m.group(3).upper()
+            slot["time"] = f"{hour}:{minute} {meridiem}"
+        digit_m = self._SLOT_DIGIT_PATTERN.search(message)
+        if digit_m:
+            slot["reply_digit"] = digit_m.group(1) or digit_m.group(2)
+        # Need at least one time signal to be a real slot pick
+        return slot if (slot.get("time") or slot.get("day") or slot.get("reply_digit")) else None
+
+    def _build_slot_confirmation(
+        self, slot: dict, customer_name: str, merchant: dict, category: dict, history: list
+    ) -> str:
+        """Build a deterministic, zero-LLM confirmation with full specifics."""
+        identity = (merchant or {}).get("identity", {})
+        owner = identity.get("owner_first_name", "")
+        locality = identity.get("locality", "") or identity.get("city", "")
+        languages = identity.get("languages", ["en"])
+        is_hindi = "hi" in languages
+        slug = (category or {}).get("slug", "")
+        emoji_map = {"dentists": "🦷", "salons": "💇", "restaurants": "🍽️", "gyms": "💪", "pharmacies": "💊"}
+        emoji = emoji_map.get(slug, "✅")
+
+        # Best offer with price
+        active_offers = [o for o in (merchant or {}).get("offers", []) if o.get("status") == "active"]
+        offer_str = ""
+        if active_offers:
+            o = active_offers[0]
+            title = o.get("title", "")
+            price = o.get("price") or o.get("value") or o.get("discounted_price")
+            offer_str = f"{title} @ ₹{price}" if (title and price) else title
+
+        # Resolve digit reply to actual slot from Vera's last message
+        slot_label = ""
+        if slot.get("reply_digit"):
+            digit = slot["reply_digit"]
+            for turn in reversed(history):
+                if turn.get("from") == "vera":
+                    found_days = self._DAY_PATTERN.findall(turn.get("msg", ""))
+                    if found_days and digit in ("1", "2"):
+                        idx = int(digit) - 1
+                        if idx < len(found_days):
+                            slot_label = found_days[idx].capitalize()
+                    break
+        else:
+            parts = []
+            if slot.get("day"):
+                parts.append(slot["day"])
+            if slot.get("date"):
+                parts.append(slot["date"])
+            if slot.get("time"):
+                parts.append(f"at {slot['time']}")
+            slot_label = " ".join(parts)
+
+        first = customer_name.split()[0] if customer_name else "there"
+        doctor = f"Dr. {owner}" if owner else (merchant or {}).get("identity", {}).get("name", "us")
+
+        if is_hindi:
+            msg_parts = [f"Perfect, {first}!"]
+            if slot_label:
+                msg_parts.append(f"{slot_label} — {doctor} ke saath confirmed hai.")
+            if offer_str:
+                msg_parts.append(f"{offer_str}.")
+            if locality:
+                msg_parts.append(f"📍 {locality}.")
+            msg_parts.append(f"Hum aapka intezaar karenge! {emoji}")
+        else:
+            msg_parts = [f"Confirmed, {first}!"]
+            if slot_label:
+                msg_parts.append(f"{slot_label} with {doctor} is all set.")
+            if offer_str:
+                msg_parts.append(f"{offer_str}.")
+            if locality:
+                msg_parts.append(f"📍 {locality}.")
+            msg_parts.append(f"See you then! {emoji}")
+
+        return " ".join(msg_parts)
+
+    def _handle_customer_reply(
+        self,
+        conv_id: str,
+        merchant_id: str,
+        customer_id: Optional[str],
+        message: str,
+        turn_number: int,
+        store,
+    ) -> dict:
+        conv = self.get_or_create(conv_id, merchant_id, customer_id)
+        if conv["state"] == "closed":
+            return {"action": "end", "rationale": "Conversation already closed."}
+
+        self.record_customer_turn(conv_id, message)  # customer messages stored as "customer"
+        merchant, category = store.get_merchant_with_category(merchant_id)
+        customer = store.get_customer(customer_id) if customer_id else None
+        customer_name = (customer or {}).get("identity", {}).get("name", "Customer")
+        merchant_name = (merchant or {}).get("identity", {}).get("name", "the business")
+        is_hindi = "hi" in ((merchant or {}).get("identity", {}).get("languages", ["en"]))
+
+        # ── STOP handling — deterministic, no LLM ──────────────────────────
+        if self._CUSTOMER_STOP_PATTERN.search(message):
+            conv["state"] = "closed"
+            first = customer_name.split()[0]
+            close_body = (
+                f"Bilkul samajh gaye, {first}. Koi baat nahi! Kabhi bhi aayein. 🙂"
+                if is_hindi
+                else f"Understood, {first}! No worries at all. Feel free to reach out anytime. 🙂"
+            )
+            self.record_vera_turn(conv_id, close_body)
+            return {"action": "end", "body": close_body, "cta": "none",
+                    "rationale": "Customer opted out — deterministic clean close."}
+
+        # ── Slot Confirmation Engine — zero LLM ────────────────────────────
+        slot = self._extract_slot(message)
+        if slot:
+            body = self._build_slot_confirmation(slot, customer_name, merchant, category, conv["turns"])
+            self.record_vera_turn(conv_id, body)
+            return {"action": "send", "body": body, "cta": "none",
+                    "rationale": f"Deterministic slot confirmation: {slot}"}
+
+        # ── LLM fallback for non-slot messages (questions, etc.) ───────────
+        history_lines = []
+        for turn in conv["turns"][-6:]:
+            # VERA's turns = what the merchant's clinic sent; CUSTOMER's turns = what the customer said
+            role = "VERA" if turn["from"] == "vera" else "CUSTOMER"
+            history_lines.append(f"[{role}]: {turn['msg']}")
+
+        active_offers = [o for o in (merchant or {}).get("offers", []) if o.get("status") == "active"]
+        offer_context = ""
+        if active_offers:
+            offer_context = "\nACTIVE OFFERS: " + json.dumps([
+                {"title": o.get("title"), "price": o.get("price") or o.get("value")}
+                for o in active_offers[:3]
+            ])
+
+        first = customer_name.split()[0]
+        owner_name = (merchant or {}).get("identity", {}).get("owner_first_name", "")
+        category_slug = (category or {}).get("slug", "")
+        # Build a warm, on-brand persona for the merchant reply
+        persona = f"Dr. {owner_name}" if (owner_name and category_slug in ("dentists", "pharmacies")) else owner_name or merchant_name
+
+        prompt = f"""CONVERSATION HISTORY:
+{chr(10).join(history_lines)}
+
+CUSTOMER'S LATEST MESSAGE: "{message}"
+
+You are Vera acting as {persona} ({merchant_name}) responding to customer {first}.
+RULES:
+- Address the customer by their first name ({first}) — NOT the merchant/doctor name.
+- You are writing FROM the merchant TO the customer.
+- If the customer picked a slot or said YES: confirm it warmly with the specific time/offer details.
+- If the customer asked a question: answer it in 1-2 sentences using the offer context.
+- Keep it warm, professional, 1-2 sentences max.
+- Do NOT mention Vera or magicpin.
+- Do NOT address the merchant name in the reply body.{offer_context}
+
+Return ONLY valid JSON:
+{{
+  "action": "send" | "end",
+  "body": "<reply addressed TO the customer {first}, NOT to the merchant>",
+  "cta": "open_ended" | "none",
+  "rationale": "<reason>"
+}}"""
+
+        try:
+            result = llm_engine.reply(prompt)
+            if result.get("action") == "send":
+                body = result.get("body", "")
+                if body:
+                    # Guard: if LLM accidentally addressed the merchant instead of customer,
+                    # detect by checking if merchant owner name appears at the start (e.g. "Dr. Meera,")
+                    owner_first = (merchant or {}).get("identity", {}).get("owner_first_name", "")
+                    if owner_first and body.strip().lower().startswith(owner_first.lower()):
+                        # Re-anchor with customer name
+                        body = f"{first}, " + body.split(",", 1)[-1].strip() if "," in body else body
+                        result["body"] = body
+                        logger.warning("Customer reply was merchant-addressed — re-anchored to customer '%s'", first)
+                    # Strip any preambles like "Of course," followed by merchant name
+                    from validator import _has_preamble
+                    if _has_preamble(body):
+                        sentences = re.split(r"(?<=[.!?])\s+", body, maxsplit=1)
+                        if len(sentences) > 1:
+                            body = sentences[1].strip()
+                            result["body"] = body
+                    self.record_vera_turn(conv_id, body)
+            return result
+        except Exception as exc:
+            logger.error("Customer reply LLM failed for %s: %s", conv_id, exc)
+            fallback = f"Got it, {first}! Let me confirm and get back to you shortly. 🙂"
+            self.record_vera_turn(conv_id, fallback)
+            return {"action": "send", "body": fallback, "cta": "open_ended", "rationale": "Fallback"}
+
     def handle_reply(
         self,
         conv_id: str,
         merchant_id: str,
         customer_id: Optional[str],
+        from_role: str,
         message: str,
         turn_number: int,
         store,  # ContextStore instance
@@ -125,13 +399,19 @@ class ConversationManager:
         3. If action needed → call LLM for reply
         4. Return { action, body, cta, rationale, ... }
         """
+        if from_role == "customer":
+            return self._handle_customer_reply(
+                conv_id, merchant_id, customer_id, message, turn_number, store
+            )
+
         conv = self.get_or_create(conv_id, merchant_id, customer_id)
 
-        # ── Early exit for closed conversations ─────────────────────────────
+        # ── Early exit for closed conversations — silent, no second "end" ──
         if conv["state"] == "closed":
             return {
-                "action": "end",
-                "rationale": "Conversation already closed. No further messages will be sent.",
+                "action": "wait",
+                "wait_seconds": 0,
+                "rationale": "Conversation already closed — no further messages.",
             }
 
         self.record_merchant_turn(conv_id, message)
@@ -139,48 +419,21 @@ class ConversationManager:
         auto_reply_type = classify_reply(message, conv["turns"])
         intent = _detect_intent(message) if auto_reply_type == "real" else "unknown"
 
-        # ── Auto-reply handling (3-stage: send → wait 24h → end) ────────────
+        # ── Auto-reply handling (3-stage: send(tick) → wait 24h → end) ────────────
         if auto_reply_type in ("auto_reply", "repeated_auto_reply"):
             conv["auto_reply_count"] += 1
 
-            if conv["auto_reply_count"] >= 3:
-                # Third auto-reply — graceful exit
+            if conv["auto_reply_count"] >= 2:
                 conv["state"] = "closed"
                 return {
                     "action": "end",
-                    "rationale": "Auto-reply 3x in a row, no real reply. Closing conversation.",
+                    "rationale": "Second auto-reply detected. Closing conversation to prevent loops.",
                 }
-            elif conv["auto_reply_count"] == 2:
-                # Second auto-reply — back off 24 hours
+            else:
                 return {
                     "action": "wait",
                     "wait_seconds": 86400,
-                    "rationale": "Same auto-reply twice in a row — owner not at phone. Wait 24h before retry.",
-                }
-            else:
-                # First auto-reply — try one gentle push to reach the real owner
-                merchant, category = store.get_merchant_with_category(merchant_id)
-                name = merchant.get("identity", {}).get("name", "") if merchant else "your team"
-                languages = merchant.get("identity", {}).get("languages", ["en"]) if merchant else ["en"]
-                if "hi" in languages:
-                    body = (
-                        "Samajh gayi — lagta hai yeh auto-reply tha. "
-                        "Kya owner ya manager directly dekh sakte hain? "
-                        "Sirf 2 minute ka kaam hai."
-                    )
-                else:
-                    body = (
-                        "Got it — looks like this was an automated reply. "
-                        "Could the owner or manager take a quick look? "
-                        "It'll take under 2 minutes."
-                    )
-                self.record_vera_turn(conv_id, body)
-                return {
-                    "action": "send",
-                    "body": body,
-                    "cta": "open_ended",
-                    "rationale": "Auto-reply detected; one push to reach the real owner.",
-                    "auto_reply_detected": True,
+                    "rationale": "Auto-reply detected. Waiting 24h before retry.",
                 }
 
         # ── Hard reject — graceful exit ────────────────────────────────────
@@ -246,11 +499,17 @@ class ConversationManager:
                 "Describe exactly what you are doing/have done for them, "
                 "or ask for the ONE missing piece of info needed to execute."
             )
-        elif conv["state"] == "engaged":
-            state_note = (
-                "\nMerchant has engaged. Keep momentum — short, direct reply. "
-                "If they're asking something specific, answer it with a fact from context."
-            )
+        else:
+            heat = self._calculate_heat_score(conv, message, intent, merchant_info)
+            agg = heat["aggression_level"]
+            if agg == "cold":
+                state_note = "\nCONVERSATION HEAT: COLD. Merchant is unresponsive. Lead with a completely new angle, not a follow-up."
+            elif agg == "hot":
+                state_note = "\nCONVERSATION HEAT: HOT. Merchant is highly engaged. Push for commitment immediately."
+            elif agg == "answer_first":
+                state_note = "\nCONVERSATION HEAT: HIGH INTENT. Merchant asked a question. Answer the question first with facts, then add CTA."
+            else:
+                state_note = "\nCONVERSATION HEAT: WARM. Merchant has engaged. Keep momentum — short, direct reply."
 
         already_sent_vera = self.all_vera_bodies(conv_id)
         sent_note = ""

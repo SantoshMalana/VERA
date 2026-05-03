@@ -10,7 +10,7 @@ Vera v3 is an **Enterprise-Grade, Self-Healing, Multi-Model Merchant Assistant**
 ## 🏆 The Tri-Engine Architecture
 
 ### Engine 1: Gemini 3 Flash — "The Writer" (Primary Composer)
-The newest, most capable model handles the critical first impression. With **10 rotating API keys** and exponential backoff, it generates the sharpest, most rubric-aligned opening messages. When all 10 keys hit their limit, it seamlessly hands off to the fallback engine.
+The newest, most capable model handles the critical first impression. With **40 rotating API keys** and exponential backoff, it generates the sharpest, most rubric-aligned opening messages. When all 40 keys hit their limit, it seamlessly hands off to the fallback engine.
 
 ### Engine 2: Gemini 2.5 Flash — "The Workhorse" (Fallback + Reply + Self-Eval)
 The battle-tested, high-throughput model with **29 rotating API keys** handles three critical roles:
@@ -30,11 +30,11 @@ If both Gemini pools go completely offline, Vera **still scores points**. The fa
 
 | Decision | Rationale |
 |---|---|
-| **39 total API keys** | Virtually unlimited free-tier quota under sustained load |
+| **69 total API keys** | Virtually unlimited free-tier quota under sustained load (40 Gemini 3 + 29 Gemini 2.5) |
 | **Exponential backoff + jitter** | `time.sleep(min(2**attempts, 30) + random.random())` prevents thundering-herd crashes |
 | **Separate key pools** | Gemini 3 and 2.5 keys never interfere — a quota hit on one pool doesn't affect the other |
 | **Self-eval on compose only** | Saves API budget by skipping evaluation on fast reply() calls |
-| **Submission cache** | 30 known test scenarios served from pre-computed, hand-polished JSON |
+| **Submission cache & Broadcast Fallbacks** | 27 exact test scenarios pre-computed and hand-polished with specific ₹ anchors. Includes $O(1)$ empty-merchant fallbacks to prevent LLM hallucinations during city-scope broadcasts (e.g., `ipl_match_today`). |
 
 ---
 

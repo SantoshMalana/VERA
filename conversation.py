@@ -494,10 +494,12 @@ Return ONLY valid JSON:
         state_note = ""
         if conv["state"] == "action_mode":
             state_note = (
-                "\nCRITICAL — MERCHANT ACCEPTED. You are in ACTION MODE. "
-                "Do NOT re-qualify. Do NOT ask 'are you sure?'. "
-                "Describe exactly what you are doing/have done for them, "
-                "or ask for the ONE missing piece of info needed to execute."
+                "\nCRITICAL — MERCHANT ACCEPTED. ACTION MODE RULES:"
+                "\n1. NEVER claim to have done something you cannot actually do (refresh offer, send email, etc.)."
+                "\n2. Instead: ask for the ONE real input needed to execute (photo? price? which slot?)."
+                "\n3. If nothing is needed: give a specific, numbered next step with a timeframe."
+                "\n4. Close the conversation in max 1-2 more turns. Do NOT drag it out."
+                "\n5. Your reply must contain a specific number (%, ₹, hours, days) — no vague promises."
             )
         else:
             heat = self._calculate_heat_score(conv, message, intent, merchant_info)

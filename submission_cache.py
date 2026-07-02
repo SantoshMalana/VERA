@@ -1,31 +1,14 @@
 """
-submission_cache.py — Pre-generated gold responses for known test scenarios
-=============================================================================
-The judge evaluates ALL submissions on the SAME 30 known (merchant, trigger) pairs.
-This module lets you:
-  1. Pre-run your bot against the 30 known scenarios
-  2. Hand-review and polish those 30 responses
-  3. Serve cached (perfect) responses when the judge hits those exact trigger IDs
-
-This is legal and smart — you're not memorizing random data, you're optimizing
-for the documented test set. The judge's novel scenarios still hit your live LLM.
-
-Usage:
-  # Step 1: Run generate_cache.py to pre-generate all 30 responses
-  # Step 2: Review and edit submission_cache.json manually
-  # Step 3: The bot.py will auto-serve cached responses (see integration below)
-
-Integration into composer.py select_and_compose:
-  from submission_cache import get_cached_response
-  cached = get_cached_response(trigger_id, merchant_id)
-  if cached:
-      actions.append(cached)
-      continue
+submission_cache.py — Version-aware fallback cache
+=====================================================================
+Cache is a FALLBACK ONLY. select_and_compose() always tries a live,
+grounded compose() first. This is only consulted if that call raises,
+and only served if the merchant/trigger context hasn't moved on since
+the cached response was generated (stale cache is worse than no cache).
 """
 from __future__ import annotations
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -55,27 +38,45 @@ def _cache_key(trigger_id: str, merchant_id: str) -> str:
     return f"{trigger_id}::{merchant_id}"
 
 
-def get_cached_response(trigger_id: str, merchant_id: str) -> Optional[dict]:
+def get_cached_response(
+    trigger_id: str,
+    merchant_id: str,
+    merchant_version: Optional[int] = None,
+    trigger_version: Optional[int] = None,
+) -> Optional[dict]:
     _load_cache()
     key = _cache_key(trigger_id, merchant_id)
     entry = _cache.get(key)
-    # Fallback: city-scope triggers (e.g. ipl_match_today) have no merchant_id
     if not entry and merchant_id:
         fallback_key = _cache_key(trigger_id, "")
         entry = _cache.get(fallback_key)
         if entry:
             logger.info("Serving fallback cached response for trigger=%s (city-scope)", trigger_id)
-    if entry:
-        logger.info("Serving cached response for trigger=%s merchant=%s", trigger_id, merchant_id)
+    if not entry:
+        return None
+
+    cached_mv = entry.get("_merchant_version")
+    cached_tv = entry.get("_trigger_version")
+    if merchant_version is not None and cached_mv is not None and cached_mv != merchant_version:
+        logger.info("Cache STALE (merchant v%s != current v%s) for %s — skipping", cached_mv, merchant_version, key)
+        return None
+    if trigger_version is not None and cached_tv is not None and cached_tv != trigger_version:
+        logger.info("Cache STALE (trigger v%s != current v%s) for %s — skipping", cached_tv, trigger_version, key)
+        return None
+
+    logger.info("Serving cached fallback for trigger=%s merchant=%s", trigger_id, merchant_id)
     return entry
 
 
-def save_response(trigger_id: str, merchant_id: str, action: dict) -> None:
-    """
-    Save a response to the cache (for use during pre-generation run).
-    """
+def save_response(
+    trigger_id: str, merchant_id: str, action: dict,
+    merchant_version: Optional[int] = None, trigger_version: Optional[int] = None,
+) -> None:
     _load_cache()
     key = _cache_key(trigger_id, merchant_id)
+    action = dict(action)
+    action["_merchant_version"] = merchant_version
+    action["_trigger_version"] = trigger_version
     _cache[key] = action
     try:
         with open(_CACHE_PATH, "w", encoding="utf-8") as f:

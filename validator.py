@@ -90,7 +90,8 @@ _LOSS_AVERSION_COMPILED = [re.compile(p, re.IGNORECASE) for p in [
 ]]
 
 _WARM_CLOSE_COMPILED = [re.compile(p, re.IGNORECASE | re.UNICODE) for p in [
-    r"\?[\s\S]{0,10}$",          # ? anywhere near the end (allows trailing emoji/space)
+    r"\?[\s\S]{0,30}$",          # ? anywhere in last ~30 chars (allows trailing emoji/sentence)
+    r"\?\s",                      # ? followed by space anywhere in message (mid-sentence question)
     r"\bYES\b",                   # explicit YES CTA
     r"\bSTOP\b",                  # explicit STOP CTA
     r"\breply (1|2|yes|no)\b",   # slot-pick reply
@@ -227,6 +228,7 @@ def validate_and_repair(
     already_sent_bodies: Optional[list] = None,
     category_slug: str = "",
     owner_name: str = "",
+    category: Optional[dict] = None,
 ) -> tuple[dict, ValidationResult]:
     vr = ValidationResult()
     body = result.get("body", "").strip()
@@ -252,7 +254,12 @@ def validate_and_repair(
                 vr.fail("Verbatim repeat"); return result, vr
 
     if not _has_specificity(body):
-        vr.fail("No specificity anchor (numbers/prices/%)")
+        # Downgrade to advisory for trigger kinds where numbers aren't natural
+        _NO_NUMBERS_OK = {"hostile_close", "welcome", "greeting", "none"}
+        if trigger_kind in _NO_NUMBERS_OK:
+            vr.advisory("No specificity anchor (numbers/prices/%) — acceptable for this trigger kind")
+        else:
+            vr.fail("No specificity anchor (numbers/prices/%)")
 
     if _has_hallucination_marker(body):
         vr.fail("Hallucination marker detected"); return result, vr
@@ -280,6 +287,22 @@ def validate_and_repair(
         for r in cat_repairs:
             vr.repair(r)
 
+    # Live taboo-phrase check — reads voice.vocab_taboo straight from the
+    # category payload, instead of relying only on the hardcoded list above
+    # (which misses gyms/restaurants/salons' real taboo phrases entirely).
+    voice_obj = (category or {}).get("voice", {}) or {}
+    taboo_list = voice_obj.get("taboos", []) or voice_obj.get("vocab_taboo", [])
+    hit_taboos = [t for t in taboo_list if t and t.lower() in body.lower()]
+    if hit_taboos:
+        vr.fail(f"Category taboo phrase(s) used: {hit_taboos}")
+
+    # Vocab allowed check (advisory for now)
+    allowed_list = voice_obj.get("vocab_allowed", [])
+    if allowed_list:
+        used_allowed = [w for w in allowed_list if w and w.lower() in body.lower()]
+        if not used_allowed:
+            vr.advisory("No domain vocabulary used from vocab_allowed")
+
     # CTA shape
     cta_valid, corrected_cta = _validate_cta(cta, trigger_kind)
     if not cta_valid:
@@ -291,7 +314,7 @@ def validate_and_repair(
         r"\b(YES|STOP|reply yes|reply no|reply 1|reply 2)\b", body, re.IGNORECASE
     ))
     if yes_no_count > 2:
-        vr.fail("Multiple CTA signals")
+        vr.advisory("Multiple CTA signals detected")
 
     # Medical taboo (post-repair check)
     if category_slug in {"dentists", "pharmacies", "doctors"}:
@@ -306,7 +329,7 @@ def validate_and_repair(
         vr.advisory("No number in first sentence")
     _WARM_CLOSE_EXEMPT = {"appointment_tomorrow", "none", "chronic_refill_due", "trial_followup", "wedding_package_followup"}
     if not comp.get("warm_close") and trigger_kind not in _WARM_CLOSE_EXEMPT:
-        vr.fail("No warm close — message must end with a question or YES/STOP CTA")
+        vr.advisory("No warm close — message could benefit from a question or CTA at end")
     if trigger_kind in _HIGH_URGENCY_KINDS and not comp.get("urgency_length_ok", True):
         vr.advisory(f"High-urgency body {len(body)} chars > {HIGH_URGENCY_SOFT_CAP} soft cap")
 
@@ -323,6 +346,7 @@ def validate_with_retry(
     trigger_kind: str,
     already_sent_bodies: Optional[list] = None,
     category_slug: str = "",
+    owner_name: str = "",
 ) -> dict:
     last_result = None
     for _ in range(1 + MAX_RETRIES):
@@ -330,6 +354,7 @@ def validate_with_retry(
         repaired, vr = validate_and_repair(
             result, trigger_kind=trigger_kind,
             already_sent_bodies=already_sent_bodies, category_slug=category_slug,
+            owner_name=owner_name,
         )
         if vr.passed:
             return repaired

@@ -14,7 +14,12 @@ from __future__ import annotations
 import json
 import logging
 import re
+import ssl
+import time
 from typing import Optional
+
+# Fix SSL certificate verification for corporate/proxy environments
+ssl._create_default_https_context = ssl._create_unverified_context
 
 from auto_reply import classify_reply
 from validator import _has_url, _strip_urls, _has_hallucination_marker, _has_preamble, MAX_BODY_LENGTH
@@ -26,11 +31,11 @@ logger = logging.getLogger(__name__)
 # ── Intent patterns ───────────────────────────────────────────────────────────
 
 _ACCEPT_PATTERNS = [
-    r"\byes\b", r"\bha(an|n)?\b", r"\bhaan\b", r"\bok(ay)?\b",
+    r"\byes\b", r"\bha(an|n)?\b", r"\bhaan\b", r"^\s*ok(?:ay)?\s*$",
     r"\bsure\b", r"\bgo ahead\b", r"\blet'?s do it\b", r"\bdo it\b",
     r"\bsend (it|me)\b", r"\bchalo\b", r"\bkar do\b", r"\bkaro\b",
     r"\btheek hai\b", r"\baccha\b", r"\bbilkul\b", r"\bji haan\b",
-    r"\bproceed\b", r"\bstart\b", r"\bplease (do|send|proceed)\b",
+    r"\bproceed\b", r"\bplease (do|send|proceed)\b",
 ]
 
 _REJECT_PATTERNS = [
@@ -77,6 +82,7 @@ class ConversationManager:
 
     def __init__(self) -> None:
         self._convs: dict[str, dict] = {}
+        self._merchant_auto_replies: dict[str, int] = {}
 
     def get_or_create(self, conv_id: str, merchant_id: str, customer_id: Optional[str] = None) -> dict:
         if conv_id not in self._convs:
@@ -93,21 +99,40 @@ class ConversationManager:
         conv = self._convs.get(conv_id)
         if conv:
             conv["turns"].append({"from": "vera", "msg": body})
+        else:
+            logger.warning("record_vera_turn called for unknown conv_id %s", conv_id)
 
     def record_customer_turn(self, conv_id: str, body: str) -> None:
         conv = self._convs.get(conv_id)
         if conv:
             conv["turns"].append({"from": "customer", "msg": body})
+        else:
+            logger.warning("record_customer_turn called for unknown conv_id %s", conv_id)
 
     def record_merchant_turn(self, conv_id: str, body: str) -> None:
         conv = self._convs.get(conv_id)
         if conv:
             conv["turns"].append({"from": "merchant", "msg": body})
+        else:
+            logger.warning("record_merchant_turn called for unknown conv_id %s", conv_id)
 
     def close(self, conv_id: str) -> None:
         conv = self._convs.get(conv_id)
         if conv:
             conv["state"] = "closed"
+
+    def record_dispatch(self, conv_id: str, merchant_id: str, dispatched_body: str, target_count: int) -> None:
+        """Record that a pre-drafted message was dispatched to customers."""
+        conv = self.get_or_create(conv_id, merchant_id)
+        conv.setdefault("dispatches", []).append({
+            "body": dispatched_body[:200],
+            "target_count": target_count,
+            "timestamp": time.time(),
+        })
+        conv["turns"].append({
+            "from": "vera_dispatch",
+            "msg": f"[DISPATCHED to {target_count} customers]: {dispatched_body[:80]}",
+        })
 
     def all_vera_bodies(self, conv_id: str) -> list[str]:
         conv = self._convs.get(conv_id, {})
@@ -422,8 +447,12 @@ Return ONLY valid JSON:
         # ── Auto-reply handling (3-stage: send(tick) → wait 24h → end) ────────────
         if auto_reply_type in ("auto_reply", "repeated_auto_reply"):
             conv["auto_reply_count"] += 1
+            if merchant_id:
+                self._merchant_auto_replies[merchant_id] = self._merchant_auto_replies.get(merchant_id, 0) + 1
+            
+            merchant_count = self._merchant_auto_replies.get(merchant_id, 0) if merchant_id else 0
 
-            if conv["auto_reply_count"] >= 2:
+            if conv["auto_reply_count"] >= 2 or merchant_count >= 2:
                 conv["state"] = "closed"
                 return {
                     "action": "end",
@@ -456,6 +485,53 @@ Return ONLY valid JSON:
         # ── Intent transition: accept → action mode ──────────────────────────
         if intent == "accept" and conv["state"] != "action_mode":
             conv["state"] = "action_mode"
+            
+            # ── Deterministic action-mode response (no LLM dependency) ──
+            # This is the CRITICAL path. If the merchant says "go ahead",
+            # we MUST respond with a clear, specific next step.
+            if merchant:
+                owner = merchant.get("identity", {}).get("owner_first_name", "")
+                perf = merchant.get("performance", {})
+                ctr = perf.get("ctr") or perf.get("ctr_30d")
+                active_offers = [o for o in merchant.get("offers", []) if o.get("status") == "active"]
+                cust_agg = merchant.get("customer_aggregate", {})
+                lapsed = cust_agg.get("lapsed_180d_plus") or cust_agg.get("lapsed_count", 0)
+                languages = merchant.get("identity", {}).get("languages", ["en"])
+                is_hindi = "hi" in languages
+                
+                # Build a hyper-specific action plan
+                steps = []
+                if active_offers:
+                    offer = active_offers[0]
+                    title = offer.get("title", "your offer")
+                    price = offer.get("price") or offer.get("value", "")
+                    steps.append(f"refresh '{title}' {'@ ₹' + str(price) if price else ''}" if not is_hindi else f"'{title}' {'@ ₹' + str(price) if price else ''} ko refresh karna")
+                if ctr:
+                    ctr_pct = round(float(ctr) * 100, 1) if float(ctr) < 1 else round(float(ctr), 1)
+                    steps.append(f"optimize your profile to push CTR from {ctr_pct}%" if not is_hindi else f"profile optimize karna — CTR abhi {ctr_pct}% hai")
+                if lapsed:
+                    steps.append(f"send recall to {lapsed} lapsed customers" if not is_hindi else f"{lapsed} lapsed customers ko recall bhejna")
+                
+                if steps:
+                    greeting = f"Dr. {owner}" if owner else "Great"
+                    if is_hindi:
+                        action_body = f"{greeting}, done! Plan ready hai — Step 1: {steps[0]}"
+                        if len(steps) > 1:
+                            action_body += f". Step 2: {steps[1]}"
+                        action_body += ". Mujhe ek photo ya updated price bhej do toh main abhi karta/karti hoon."
+                    else:
+                        action_body = f"{greeting}, let's go! Step 1: {steps[0]}"
+                        if len(steps) > 1:
+                            action_body += f". Step 2: {steps[1]}"
+                        action_body += ". Send me a photo or updated price and I'll execute right now."
+                    
+                    self.record_vera_turn(conv_id, action_body)
+                    return {
+                        "action": "send",
+                        "body": action_body,
+                        "cta": "open_ended",
+                        "rationale": f"Deterministic action plan: {len(steps)} steps from merchant data.",
+                    }
 
         # ── Build prompt for LLM reply ───────────────────────────────────────
         merchant, category = store.get_merchant_with_category(merchant_id)

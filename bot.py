@@ -113,7 +113,7 @@ async def metadata():
     return {
         "team_name": "Vera Intelligence",
         "team_members": ["Santosh Malana"],
-        "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        "model": f"{os.getenv('GEMINI3_MODEL', 'gemini-3-flash-preview')} (primary) + {os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')} (fallback)",
         "approach": (
             "Trigger-kind router with per-kind prompt variants, "
             "pattern-based auto-reply detection, conversation state machine "
@@ -188,9 +188,9 @@ async def tick(body: TickBody):
         customer_id = action.get("customer_id")
         body_text = action.get("body", "")
 
-        if conv_id and body_text:
+        if conv_id and body_text and body_text.strip():
             conversation_manager.get_or_create(conv_id, merchant_id, customer_id)
-            conversation_manager.record_vera_turn(conv_id, body_text)
+            conversation_manager.record_vera_turn(conv_id, body_text.strip())
 
     logger.info("Tick returning %d actions", len(actions))
     return {"actions": actions}
@@ -218,6 +218,11 @@ async def reply(body: ReplyBody):
 
     # Strip internal fields before returning to judge
     result.pop("auto_reply_detected", None)
+    
+    # Ensure a body key is always returned to prevent judge errors
+    if "body" not in result and result.get("action") in ("wait", "end"):
+        result["body"] = ""
+        
     return result
 
 
@@ -227,9 +232,56 @@ async def reply(body: ReplyBody):
 async def teardown():
     store._store.clear()
     conversation_manager._convs.clear()
+    conversation_manager._merchant_auto_replies.clear()
     sent_suppression_keys.clear()
+    
+    import submission_cache
+    submission_cache._cache.clear()
+    
     logger.info("State wiped on teardown.")
     return {"status": "wiped"}
+
+
+# ── Dispatch endpoint (Trojan Horse execution) ────────────────────────────────
+
+class DispatchBody(BaseModel):
+    merchant_id: str
+    message_body: str
+    target_customer_ids: list[str] = []
+    conversation_id: str = ""
+
+@app.post("/v1/dispatch")
+async def dispatch_customer_message(body: DispatchBody):
+    """
+    Execute a pre-drafted customer-facing message on behalf of the merchant.
+    This is the backend for the zero-friction 'Reply Send' Trojan Horse pattern.
+    
+    In production, this would push to WhatsApp Business API.
+    For the challenge, we log the dispatch and return success.
+    """
+    target_count = len(body.target_customer_ids) or 1
+    logger.info(
+        "DISPATCH: merchant=%s sending to %d customers. Body: %s",
+        body.merchant_id,
+        target_count,
+        body.message_body[:100],
+    )
+    
+    # Record the dispatch in conversation state
+    if body.conversation_id:
+        conversation_manager.record_dispatch(
+            conv_id=body.conversation_id,
+            merchant_id=body.merchant_id,
+            dispatched_body=body.message_body,
+            target_count=target_count,
+        )
+    
+    return {
+        "status": "dispatched",
+        "merchant_id": body.merchant_id,
+        "recipients": target_count,
+        "message_preview": body.message_body[:80],
+    }
 
 
 # ── Global exception handler ──────────────────────────────────────────────────

@@ -6,7 +6,7 @@ All lookups are O(1); version conflicts return the current version for a 409.
 from __future__ import annotations
 from threading import Lock
 from typing import Any, Optional
-
+import time
 
 class ContextStore:
     def __init__(self) -> None:
@@ -35,7 +35,7 @@ class ContextStore:
                 cat_payload = cat_entry["payload"] if cat_entry else None
                 payload["_dna"] = extract_merchant_dna(payload, category=cat_payload)
 
-            self._store[key] = {"version": version, "payload": payload}
+            self._store[key] = {"version": version, "payload": payload, "updated_at": time.time()}
             return {"accepted": True}
 
     # ------------------------------------------------------------------ read
@@ -47,6 +47,12 @@ class ContextStore:
     def get_version(self, scope: str, context_id: str) -> Optional[int]:
         entry = self._store.get((scope, context_id))
         return entry["version"] if entry else None
+
+    def is_recently_updated(self, scope: str, context_id: str, since_seconds: int = 300) -> bool:
+        entry = self._store.get((scope, context_id))
+        if entry and "updated_at" in entry:
+            return (time.time() - entry["updated_at"]) <= since_seconds
+        return False
 
     def get_all(self, scope: str) -> list[dict]:
         return [

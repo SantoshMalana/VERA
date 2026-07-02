@@ -184,7 +184,11 @@ def generate_all(target_merchant: str = None, force: bool = False) -> None:
                     "_self_eval_scores": result.get("self_eval_scores", {}),
                 }
 
-                save_response(tid, mid, action)
+                save_response(
+                    tid, mid, action,
+                    merchant_version=store.get_version("merchant", mid),
+                    trigger_version=store.get_version("trigger", tid),
+                )
                 count += 1
                 time.sleep(0.5)  # Gentle rate limiting
 
@@ -225,28 +229,36 @@ def review_cache() -> None:
     print(f"{'='*60}\n")
 
 def prewarm_trigger(trigger: dict) -> None:
-    """Background task to pre-generate a trigger."""
+    """Background task to pre-generate a fallback-cache entry for a trigger.
+    NOTE: this only ever backstops a live compose() failure now (see composer.py's
+    select_and_compose) — it's never served ahead of a live, grounded response.
+    """
     from contexts import store
-    tid = trigger.get("trigger_id")
-    mid = trigger.get("merchant_id")
+    tid = trigger.get("id") or trigger.get("trigger_id")   # real field is "id"
+    mid = trigger.get("merchant_id") or trigger.get("payload", {}).get("merchant_id")
     if not tid or not mid:
         return
         
     merchant, category = store.get_merchant_with_category(mid)
     if not merchant or not category:
         return
-        
+
     customer_id = trigger.get("customer_id") or trigger.get("payload", {}).get("customer_id")
     customer = store.get("customer", customer_id) if customer_id else None
-    
-    from submission_cache import _cache_key, _cache
-    if _cache_key(tid, mid) in _cache:
-        return # already cached
-        
+
+    from submission_cache import get_cached_response
+    mv = store.get_version("merchant", mid)
+    tv = store.get_version("trigger", tid)
+    if get_cached_response(tid, mid, merchant_version=mv, trigger_version=tv):
+        return  # already have a version-fresh entry
+
     try:
         from composer import compose_message
-        result = compose_message(category, merchant, trigger, customer, use_tournament=True)
-            
+        # use_tournament=False — this is a background safety net now, not the
+        # served answer, so keep it cheap and don't compete with live /v1/tick
+        # calls for API quota during the judge's test window.
+        result = compose_message(category, merchant, trigger, customer, use_tournament=False)
+
         identity = merchant.get("identity", {})
         owner_name = identity.get("owner_first_name", identity.get("name", ""))
         trigger_kind = trigger.get("kind", "generic")
@@ -266,8 +278,9 @@ def prewarm_trigger(trigger: dict) -> None:
             "_cached": True,
             "_self_eval_scores": result.get("self_eval_scores", {}),
         }
-        save_response(tid, mid, action)
-        logger.info("Pre-warmed trigger %s for %s", tid, mid)
+        from submission_cache import save_response
+        save_response(tid, mid, action, merchant_version=mv, trigger_version=tv)
+        logger.info("Pre-warmed fallback cache for trigger %s / merchant %s", tid, mid)
     except Exception as exc:
         logger.error("Failed to prewarm %s → %s: %s", tid, mid, exc)
 

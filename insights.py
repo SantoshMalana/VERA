@@ -36,12 +36,65 @@ def ctr_vs_peer(merchant: dict, category: dict) -> dict:
     direction = "below" if gap_pct > 0 else "above"
     gap_abs = abs(gap_pct)
 
+    # Predictive ROI projection — dynamic math, not hardcoded
+    views_30d = perf.get("views_30d") or perf.get("views", 1000)
+
+    # Dynamic conversion rate: derive from merchant's own data if available
+    cust_agg = merchant.get("customer_aggregate", {})
+    active_customers = cust_agg.get("active_count", 0)
+    total_customers = cust_agg.get("total_count", 0) or active_customers
+    calls_30d = perf.get("calls_30d") or perf.get("calls", 0)
+    leads_30d = perf.get("leads_30d") or perf.get("leads", 0)
+
+    if total_customers and views_30d and views_30d > 0:
+        # Best signal: actual customers / actual views (lifetime-normalized to 30d)
+        conversion_rate = min(total_customers / max(views_30d * 6, 1), 0.25)  # cap at 25%
+    elif (calls_30d + leads_30d) and views_30d > 0:
+        # Fallback: (calls + leads) / views as a proxy
+        conversion_rate = min((calls_30d + leads_30d) / views_30d, 0.25)
+    else:
+        conversion_rate = category.get("conversion_rate", 0.10)  # category or 10% default
+    conversion_rate = max(conversion_rate, 0.03)  # floor at 3%
+    conversion_pct = round(conversion_rate * 100, 1)
+
+    # Average transaction: use merchant's own active offers first, then catalog
+    merchant_offers = [o for o in merchant.get("offers", []) if o.get("status") == "active"]
+    catalog = category.get("offer_catalog", [])
+    price_sources = merchant_offers if merchant_offers else catalog
+    prices = []
+    for offer in price_sources:
+        val = offer.get("value") or offer.get("price")
+        if val:
+            try:
+                prices.append(float(str(val).replace("₹", "").replace(",", "").strip()))
+            except ValueError:
+                pass
+    avg_price = sum(prices) / len(prices) if prices else 350
+
+    extra_clicks = 0
+    extra_bookings = 0
+    extra_revenue = 0
+
+    if gap_pct > 0:  # merchant is below peer
+        extra_clicks = (peer_ctr - merchant_ctr) * views_30d
+        extra_bookings = extra_clicks * conversion_rate
+        extra_revenue = extra_bookings * avg_price
+
     return {
-        "merchant_ctr": round(merchant_ctr * 100, 2),       # as percentage string
+        "merchant_ctr": round(merchant_ctr * 100, 2),
         "peer_ctr": round(peer_ctr * 100, 2),
         "gap_direction": direction,
         "gap_pct": round(gap_abs, 1),
+        "projected_bookings": math.ceil(extra_bookings),
+        "projected_revenue": round(extra_revenue),
+        "conversion_rate_used": conversion_pct,
+        "avg_ticket_used": round(avg_price),
         "summary": (
+            f"CTR {round(merchant_ctr*100,1)}% is {round(gap_abs,0):.0f}% {direction} "
+            f"the peer median of {round(peer_ctr*100,1)}%. "
+            f"Closing this gap → +{math.ceil(extra_bookings)} bookings "
+            f"(₹{round(extra_revenue):,}) at your {conversion_pct}% conversion × ₹{round(avg_price)} avg ticket."
+            if extra_bookings > 0 else
             f"CTR {round(merchant_ctr*100,1)}% is {round(gap_abs,0):.0f}% {direction} "
             f"the peer median of {round(peer_ctr*100,1)}%"
         ),
@@ -289,6 +342,38 @@ def patient_cohort_insight(merchant: dict) -> dict:
     return result
 
 
+# ── Review theme insight ──────────────────────────────────────────────────────
+
+def review_theme_insight(merchant: dict) -> dict:
+    """
+    Surfaces the merchant's most relevant review theme. This is the ONLY
+    source of truth for generated review_theme_emerged triggers, which carry
+    just a placeholder payload.
+    """
+    themes = merchant.get("review_themes", [])
+    if not themes:
+        return {}
+
+    def sort_key(t):
+        return (t.get("occurrences_30d", 0), t.get("sentiment") == "neg")
+
+    top = sorted(themes, key=sort_key, reverse=True)[0]
+    theme = top.get("theme", "")
+    sentiment = top.get("sentiment", "")
+    occurrences = top.get("occurrences_30d", 0)
+    quote = top.get("common_quote", "")
+
+    summary = f"{occurrences} reviews (30d) mention '{theme}' ({sentiment})"
+    if quote:
+        summary += f' — e.g. "{quote}"'
+
+    return {
+        "theme": theme, "sentiment": sentiment,
+        "occurrences_30d": occurrences, "common_quote": quote,
+        "summary": summary,
+    }
+
+
 # ── Aggregate all insights ────────────────────────────────────────────────────
 
 def derive_insights(merchant: dict, category: dict, trigger: dict) -> dict:
@@ -329,6 +414,12 @@ def derive_insights(merchant: dict, category: dict, trigger: dict) -> dict:
         trend = top_trend(category)
         if trend:
             insights["top_trend"] = trend
+
+    # Review theme — primary grounding fact for review_theme_emerged triggers
+    if "review_theme" in trigger_kind:
+        review_theme = review_theme_insight(merchant)
+        if review_theme:
+            insights["review_theme"] = review_theme
 
     # Performance delta summary
     perf = merchant.get("performance", {})

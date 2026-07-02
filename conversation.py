@@ -482,6 +482,10 @@ Return ONLY valid JSON:
                 "rationale": "Merchant opted out. Sending polite close and ending conversation.",
             }
 
+        # ── Fetch Context early ──────────────────────────────────────────────
+        merchant, category = store.get_merchant_with_category(merchant_id)
+        customer = store.get_customer(customer_id) if customer_id else None
+
         # ── Intent transition: accept → action mode ──────────────────────────
         if intent == "accept" and conv["state"] != "action_mode":
             conv["state"] = "action_mode"
@@ -534,9 +538,6 @@ Return ONLY valid JSON:
                     }
 
         # ── Build prompt for LLM reply ───────────────────────────────────────
-        merchant, category = store.get_merchant_with_category(merchant_id)
-        customer = store.get_customer(customer_id) if customer_id else None
-
         # Build compact conversation summary for the LLM
         history_lines = []
         for turn in conv["turns"][-6:]:  # last 6 turns max
@@ -664,13 +665,16 @@ Return ONLY the JSON object."""
 
         except Exception as exc:
             logger.error("Reply LLM call failed for %s: %s", conv_id, exc)
-            # Use specific_fallback instead of generic message
-            try:
-                fallback_result = llm_engine.specific_fallback(merchant or {}, category or {}, {})
-                fallback_body = fallback_result.get("body", "Got it, looking into this now.")
-            except Exception:
-                name = (merchant or {}).get("identity", {}).get("owner_first_name", "")
-                fallback_body = f"{'Haan ' + name + ', ' if name else ''}ek second — main check kar ke batati hoon."
+            # Do NOT use specific_fallback here because that generates an opening message, not a reply!
+            name = (merchant or {}).get("identity", {}).get("owner_first_name", "")
+            languages = (merchant or {}).get("identity", {}).get("languages", ["en"])
+            is_hindi = "hi" in languages
+            
+            if is_hindi:
+                fallback_body = f"{'Haan Dr. ' + name + ', ' if name else 'Haan, '}ek second — main check kar ke batati hoon."
+            else:
+                fallback_body = f"{'Got it Dr. ' + name + ', ' if name else 'Got it, '}let me look into this right away."
+                
             self.record_vera_turn(conv_id, fallback_body)
             return {
                 "action": "send",

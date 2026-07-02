@@ -36,6 +36,7 @@ If both Gemini pools go completely offline, Vera **still scores points**. The fa
 | **Self-eval on compose only** | Saves API budget by skipping evaluation on fast reply() calls |
 | **Submission cache & Fallbacks** | 29 exact test scenarios pre-computed and hand-polished with specific ₹ anchors. Includes $O(1)$ empty-merchant fallbacks to prevent LLM hallucinations during city-scope broadcasts (e.g., `ipl_match_today`). |
 | **Strict Action-Mode Guard** | Prompt engineering enforces concrete execution (e.g., "which slot?") instead of "fake actions," ensuring rapid 2-turn closures. |
+| **Deterministic Upgrades** | Specificity is guaranteed natively via a custom `inr()` Indian currency formatter (e.g., ₹1,00,000). Offer prioritization intelligently boosts `₹`-based offers over `%` discounts. Emoji use is strictly mapped by category (e.g. 🦷/💊 for health, 🍕/🍽️ for food) via prompt instructions. |
 
 ---
 

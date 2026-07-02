@@ -16,6 +16,33 @@ from datetime import datetime, timezone
 from typing import Optional
 import math
 
+# ----------------------------------------------------------------------------
+# Number / currency formatting (Indian digit grouping, ₹ formatting)
+# ----------------------------------------------------------------------------
+
+def inr(amount) -> str:
+    """Format a number the Indian way: 1,00,000 not 100,000."""
+    try:
+        n = int(round(float(amount)))
+    except (TypeError, ValueError):
+        return str(amount)
+    neg = n < 0
+    n = abs(n)
+    s = str(n)
+    if len(s) <= 3:
+        out = s
+    else:
+        last3 = s[-3:]
+        rest = s[:-3]
+        groups = []
+        while len(rest) > 2:
+            groups.insert(0, rest[-2:])
+            rest = rest[:-2]
+        if rest:
+            groups.insert(0, rest)
+        out = ",".join(groups) + "," + last3
+    return ("-" if neg else "") + out
+
 
 # ── CTR analysis ──────────────────────────────────────────────────────────────
 
@@ -93,7 +120,7 @@ def ctr_vs_peer(merchant: dict, category: dict) -> dict:
             f"CTR {round(merchant_ctr*100,1)}% is {round(gap_abs,0):.0f}% {direction} "
             f"the peer median of {round(peer_ctr*100,1)}%. "
             f"Closing this gap → +{math.ceil(extra_bookings)} bookings "
-            f"(₹{round(extra_revenue):,}) at your {conversion_pct}% conversion × ₹{round(avg_price)} avg ticket."
+            f"(₹{inr(extra_revenue)}) at your {conversion_pct}% conversion × ₹{inr(avg_price)} avg ticket."
             if extra_bookings > 0 else
             f"CTR {round(merchant_ctr*100,1)}% is {round(gap_abs,0):.0f}% {direction} "
             f"the peer median of {round(peer_ctr*100,1)}%"
@@ -133,8 +160,8 @@ def lapsed_revenue_opportunity(merchant: dict, category: dict) -> dict:
         "avg_transaction_inr": round(avg_price),
         "opportunity_inr": round(opportunity),
         "summary": (
-            f"{lapsed_count} lapsed customers × avg ₹{round(avg_price)} "
-            f"= ₹{round(opportunity):,} in recoverable revenue"
+            f"{lapsed_count} lapsed customers × avg ₹{inr(avg_price)} "
+            f"= ₹{inr(opportunity)} in recoverable revenue"
         ),
     }
 
@@ -231,6 +258,11 @@ def best_offer(merchant: dict, category: dict) -> dict:
         if o.get("status") == "active" and o.get("title")
     ]
     if merchant_offers:
+        def offer_score(o):
+            title = o.get("title", "").lower()
+            return 1 if "₹" in title or "rs" in title else 0
+            
+        merchant_offers.sort(key=offer_score, reverse=True)
         offer = merchant_offers[0]
         return {
             "title": offer.get("title"),
